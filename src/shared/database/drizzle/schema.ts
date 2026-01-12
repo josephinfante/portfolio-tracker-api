@@ -1,1 +1,1 @@
-// export * from "@modules/users/infrastructure/drizzle/user.schema";
+export * from "@modules/users/infrastructure/drizzle/user.schema";
