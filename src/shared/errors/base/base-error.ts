@@ -1,6 +1,15 @@
 import { IErrorMetadata, ISerializableError } from "./interfaces";
 import { ErrorCategory, ErrorSeverity } from "./types";
 
+const domainErrorsMap = [
+	"AuthenticationError",
+	"AuthorizationError",
+	"BusinessLogicError",
+	"ConflictError",
+	"NotFoundError",
+	"ValidationError",
+];
+
 export abstract class BaseError extends Error implements ISerializableError {
 	public readonly timestamp: Date;
 	public readonly isOperational: boolean = true;
@@ -12,7 +21,7 @@ export abstract class BaseError extends Error implements ISerializableError {
 		message: string,
 		public readonly severity: ErrorSeverity = ErrorSeverity.MEDIUM,
 		public readonly category: ErrorCategory,
-		additionalMetadata: Partial<IErrorMetadata> = {}
+		additionalMetadata: Partial<IErrorMetadata> = {},
 	) {
 		super(message);
 
@@ -51,11 +60,22 @@ export abstract class BaseError extends Error implements ISerializableError {
 	 * Crea una representación para cliente (sin información sensible)
 	 */
 	public toClientSafe(): Partial<ISerializableError> {
+		const message = domainErrorsMap.includes(this.name) ? this.message : "An unexpected error occurred.";
+		return {
+			name: this.name,
+			message,
+			statusCode: this.statusCode,
+			code: this.code,
+		};
+	}
+
+	public toDevelopSafe(): Partial<ISerializableError> {
 		return {
 			name: this.name,
 			message: this.message,
 			statusCode: this.statusCode,
 			code: this.code,
+			metadata: this.metadata,
 		};
 	}
 
