@@ -5,4 +5,7 @@ export const TOKENS = {
 	RedisClient: Symbol.for("RedisClient"),
 	Drizzle: Symbol.for("Drizzle"),
 	Logger: Symbol.for("Logger"),
+
+	PasswordHasher: Symbol.for("PasswordHasher"),
+	TokenService: Symbol.for("TokenService"),
 };

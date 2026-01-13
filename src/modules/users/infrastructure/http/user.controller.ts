@@ -7,11 +7,6 @@ import { injectable } from "tsyringe";
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
-	create = asyncHandler(async (req: Request, res: Response) => {
-		const response = await this.userService.createUser(req.body);
-		return res.status(201).success(response);
-	});
-
 	update = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
 		const response = await this.userService.updateUser(userId, req.body);

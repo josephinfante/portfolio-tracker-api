@@ -1,7 +1,7 @@
 import { globalRegex } from "@shared/config/global-regex";
 import z from "zod";
 
-export const CreateUserSchema = z.object({
+export const SignUpSchema = z.object({
 	firstName: z.string().min(1, "First name is required"),
 	lastName: z.string().min(1, "Last name is required"),
 
@@ -15,5 +15,4 @@ export const CreateUserSchema = z.object({
 		),
 });
 
-// Infer schema → CreateUserDTO
-export type CreateUserDTO = z.infer<typeof CreateUserSchema>;
+export type SignUpDTO = z.infer<typeof SignUpSchema>;

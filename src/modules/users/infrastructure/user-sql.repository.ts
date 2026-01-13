@@ -9,6 +9,7 @@ import { UserMapper } from "./user.mappers";
 import { CreateUserInput, UpdateUserInput } from "../domain/user.types";
 import bcrypt from "bcryptjs";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
+import { v4 as uuidv4 } from "uuid";
 
 @injectable()
 export class UserSqlRepository implements UserRepository {
@@ -32,18 +33,16 @@ export class UserSqlRepository implements UserRepository {
 
 	async create(input: CreateUserInput): Promise<UserEntity> {
 		const now = this.now();
-		const salt = bcrypt.genSaltSync(10);
-		const passwordHash = bcrypt.hashSync(input.password, salt);
 
 		const [row] = await this.db
 			.insert(usersTable)
 			.values({
-				id: crypto.randomUUID(),
+				id: uuidv4(),
 
 				firstName: input.firstName,
 				lastName: input.lastName,
 				email: input.email,
-				passwordHash,
+				passwordHash: input.password,
 
 				createdAt: now,
 				updatedAt: now,
@@ -55,17 +54,11 @@ export class UserSqlRepository implements UserRepository {
 
 	async update(id: string, input: UpdateUserInput): Promise<UserEntity> {
 		const now = this.now();
-		let passwordHash: string | undefined = undefined;
-		if (input.newPassword) {
-			const salt = bcrypt.genSaltSync(10);
-			passwordHash = bcrypt.hashSync(input.newPassword, salt);
-		}
 
 		const [row] = await this.db
 			.update(usersTable)
 			.set({
 				...input,
-				...(passwordHash && { passwordHash }),
 				updatedAt: now,
 			})
 			.where(eq(usersTable.id, id))
