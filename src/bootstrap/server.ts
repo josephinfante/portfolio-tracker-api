@@ -1,11 +1,15 @@
 import { createApp } from "@bootstrap/create-app";
 import { environment } from "@shared/config/environment";
+import { TOKENS } from "@shared/container/tokens";
 import { logger } from "@shared/logger";
+import { RedisClient } from "@shared/redis/redis.client";
+import { container } from "tsyringe";
 
 export async function startServer() {
 	const app = createApp();
 
-	// redis connection
+	const redis = container.resolve<RedisClient>(TOKENS.RedisClient);
+	await redis.connect();
 
 	const server = app.listen(environment.PORT, () => {
 		logger.info(`Server running in ${environment.NODE_ENV} mode on port ${environment.PORT}`);
@@ -16,7 +20,7 @@ export async function startServer() {
 
 		server.close();
 
-		// close other connections like db, redis, etc.
+		await redis.disconnect();
 
 		logger.info("Shutdown complete.");
 		process.exit(0);
