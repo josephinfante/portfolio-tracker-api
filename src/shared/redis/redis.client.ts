@@ -10,7 +10,6 @@ export class RedisClient {
 	constructor() {
 		this.client = new Redis(environment.REDIS_URL!, {
 			lazyConnect: true,
-			enableOfflineQueue: false,
 			maxRetriesPerRequest: 2,
 			retryStrategy(times) {
 				return Math.min(times * 50, 2000);
@@ -52,5 +51,21 @@ export class RedisClient {
 
 	get instance() {
 		return this.client;
+	}
+
+	async exists(key: string): Promise<boolean> {
+		return (await this.client.exists(key)) === 1;
+	}
+
+	async setex(key: string, ttl: number, value: string): Promise<void> {
+		await this.client.setex(key, ttl, value);
+	}
+
+	async get(key: string): Promise<string | null> {
+		return this.client.get(key);
+	}
+
+	async del(key: string): Promise<void> {
+		await this.client.del(key);
 	}
 }
