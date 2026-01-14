@@ -22,6 +22,13 @@
       "when": 1768369258066,
       "tag": "0002_acoustic_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768411715080,
+      "tag": "0003_real_ben_grimm",
+      "breakpoints": true
     }
   ]
 }
