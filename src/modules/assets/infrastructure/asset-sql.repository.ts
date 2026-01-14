@@ -1,0 +1,116 @@
+import { inject, injectable } from "tsyringe";
+import { AssetRepository } from "../domain/asset.repository";
+import { TOKENS } from "@shared/container/tokens";
+import { Drizzle } from "@shared/database/drizzle/client";
+import { AssetEntity } from "../domain/asset.entity";
+import { assetTable } from "./drizzle/asset.schema";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { AssetMapper } from "./asset.mappers";
+import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "../domain/asset.types";
+import { NotFoundError } from "@shared/errors/domain/not-found.error";
+import { v4 as uuidv4 } from "uuid";
+
+@injectable()
+export class AssetSqlRepository implements AssetRepository {
+	constructor(@inject(TOKENS.Drizzle) private readonly db: Drizzle) {}
+
+	private now(): number {
+		return Date.now();
+	}
+
+	private buildWhere(userId: string, options?: AssetListFilters) {
+		const conditions = [eq(assetTable.userId, userId)];
+
+		const searchValue = options?.search?.trim();
+
+		if (searchValue && searchValue.length > 0) {
+			const searchCondition = or(
+				ilike(assetTable.symbol, `%${searchValue}%`),
+				ilike(assetTable.name, `%${searchValue}%`),
+			);
+
+			if (searchCondition) {
+				conditions.push(searchCondition);
+			}
+		}
+
+		if (options?.type) {
+			conditions.push(eq(assetTable.asset_type, options.type));
+		}
+
+		return conditions.length ? and(...conditions) : undefined;
+	}
+
+	async findById(id: string): Promise<AssetEntity | null> {
+		const rows = await this.db.select().from(assetTable).where(eq(assetTable.id, id)).limit(1);
+
+		return rows[0] ? AssetMapper.toEntity(rows[0]) : null;
+	}
+
+	async findByUserId(
+		userId: string,
+		options?: AssetListFilters,
+	): Promise<{ items: AssetEntity[]; totalCount: number }> {
+		const where = this.buildWhere(userId, options);
+
+		const [{ count }] = await this.db
+			.select({ count: sql<number>`count(*)` })
+			.from(assetTable)
+			.where(where);
+
+		const query = this.db.select().from(assetTable).where(where);
+
+		const rows =
+			options?.limit && options.limit > 0 ? await query.limit(options.limit).offset(options.offset ?? 0) : await query;
+
+		return {
+			items: AssetMapper.toEntityList(rows),
+			totalCount: Number(count ?? 0),
+		};
+	}
+
+	async create(input: CreateAssetInput): Promise<AssetEntity> {
+		const now = this.now();
+
+		const [row] = await this.db
+			.insert(assetTable)
+			.values({
+				id: uuidv4(),
+				userId: input.userId,
+				symbol: input.symbol,
+				name: input.name,
+				asset_type: input.asset_type,
+				pricing_source: input.pricing_source,
+				external_id: input.external_id,
+				quote_currency: input.quote_currency,
+				createdAt: now,
+				updatedAt: now,
+			})
+			.returning();
+
+		return AssetMapper.toEntity(row);
+	}
+
+	async update(id: string, input: UpdateAssetInput): Promise<AssetEntity> {
+		const now = this.now();
+
+		const [row] = await this.db
+			.update(assetTable)
+			.set({
+				...input,
+				updatedAt: now,
+			})
+			.where(eq(assetTable.id, id))
+			.returning();
+
+		if (!row) {
+			throw new NotFoundError(`Asset with id ${id} not found`);
+		}
+
+		return AssetMapper.toEntity(row);
+	}
+
+	async delete(id: string): Promise<void> {
+		await this.db.delete(assetTable).where(eq(assetTable.id, id)).returning();
+	}
+}
