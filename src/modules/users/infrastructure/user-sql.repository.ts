@@ -7,7 +7,6 @@ import { usersTable } from "./drizzle/user.schema";
 import { eq } from "drizzle-orm";
 import { UserMapper } from "./user.mappers";
 import { CreateUserInput, UpdateUserInput } from "../domain/user.types";
-import bcrypt from "bcryptjs";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { v4 as uuidv4 } from "uuid";
 
