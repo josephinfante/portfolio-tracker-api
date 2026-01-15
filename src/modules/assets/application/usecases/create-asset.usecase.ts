@@ -10,11 +10,7 @@ import { AssetType } from "@modules/assets/domain/asset.types";
 export class CreateAssetUseCase {
 	constructor(@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository) {}
 
-	async execute(userId: string, input: unknown) {
-		if (!userId || typeof userId !== "string") {
-			throw new ValidationError("Invalid user ID", "userId");
-		}
-
+	async execute(input: unknown) {
 		const result = CreateAssetSchema.safeParse(input);
 		if (!result.success) {
 			throw new ValidationError("Invalid asset data", undefined, undefined, {
@@ -25,7 +21,6 @@ export class CreateAssetUseCase {
 		const data = result.data;
 
 		return await this.assetRepository.create({
-			userId,
 			symbol: data.symbol,
 			name: data.name,
 			asset_type: data.asset_type as AssetType,

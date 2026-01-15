@@ -3,7 +3,7 @@ import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "./asset.ty
 
 export interface AssetRepository {
 	findById(id: string): Promise<AssetEntity | null>;
-	findByUserId(userId: string, options?: AssetListFilters): Promise<{ items: AssetEntity[]; totalCount: number }>;
+	findAll(options?: AssetListFilters): Promise<{ items: AssetEntity[]; totalCount: number }>;
 
 	create(data: CreateAssetInput): Promise<AssetEntity>;
 	update(id: string, data: UpdateAssetInput): Promise<AssetEntity>;

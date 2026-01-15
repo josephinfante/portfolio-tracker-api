@@ -4,7 +4,7 @@ import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { AssetEntity } from "../domain/asset.entity";
 import { assetsTable } from "./drizzle/asset.schema";
-import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, or, sql, SQL } from "drizzle-orm";
 import { AssetMapper } from "./asset.mappers";
 import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "../domain/asset.types";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
@@ -18,8 +18,8 @@ export class AssetSqlRepository implements AssetRepository {
 		return Date.now();
 	}
 
-	private buildWhere(userId: string, options?: AssetListFilters) {
-		const conditions = [eq(assetsTable.userId, userId)];
+	private buildWhere(options?: AssetListFilters) {
+		const conditions: SQL[] = [];
 
 		const searchValue = options?.search?.trim();
 
@@ -47,21 +47,23 @@ export class AssetSqlRepository implements AssetRepository {
 		return rows[0] ? AssetMapper.toEntity(rows[0]) : null;
 	}
 
-	async findByUserId(
-		userId: string,
-		options?: AssetListFilters,
-	): Promise<{ items: AssetEntity[]; totalCount: number }> {
-		const where = this.buildWhere(userId, options);
+	async findAll(options?: AssetListFilters): Promise<{ items: AssetEntity[]; totalCount: number }> {
+		const where = this.buildWhere(options);
 
-		const [{ count }] = await this.db
-			.select({ count: sql<number>`count(*)` })
-			.from(assetsTable)
-			.where(where);
+		const countQuery = this.db.select({ count: sql<number>`count(*)` }).from(assetsTable);
+		const dataQuery = this.db.select().from(assetsTable);
 
-		const query = this.db.select().from(assetsTable).where(where);
+		if (where) {
+			countQuery.where(where);
+			dataQuery.where(where);
+		}
+
+		const [{ count }] = await countQuery;
 
 		const rows =
-			options?.limit && options.limit > 0 ? await query.limit(options.limit).offset(options.offset ?? 0) : await query;
+			options?.limit && options.limit > 0
+				? await dataQuery.limit(options.limit).offset(options.offset ?? 0)
+				: await dataQuery;
 
 		return {
 			items: AssetMapper.toEntityList(rows),
@@ -76,7 +78,6 @@ export class AssetSqlRepository implements AssetRepository {
 			.insert(assetsTable)
 			.values({
 				id: uuidv4(),
-				userId: input.userId,
 				symbol: input.symbol,
 				name: input.name,
 				asset_type: input.asset_type,
