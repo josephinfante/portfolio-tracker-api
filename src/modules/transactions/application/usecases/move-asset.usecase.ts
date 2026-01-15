@@ -74,17 +74,9 @@ export class MoveAssetUseCase {
 			throw new NotFoundError(`Asset ${data.toAssetId} not found`);
 		}
 
-		if (fromAsset.userId !== userId || toAsset.userId !== userId) {
-			throw new AuthorizationError("Access denied");
-		}
-
 		const feeAsset = data.fee ? await this.assetRepository.findById(data.fee.assetId) : null;
 		if (data.fee && !feeAsset) {
 			throw new NotFoundError(`Asset ${data.fee.assetId} not found`);
-		}
-
-		if (feeAsset && feeAsset.userId !== userId) {
-			throw new AuthorizationError("Access denied");
 		}
 
 		this.assertAccountSupportsAsset(fromAccount, fromAsset, "source");
