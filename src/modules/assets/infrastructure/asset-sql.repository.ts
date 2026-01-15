@@ -3,7 +3,7 @@ import { AssetRepository } from "../domain/asset.repository";
 import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { AssetEntity } from "../domain/asset.entity";
-import { assetTable } from "./drizzle/asset.schema";
+import { assetsTable } from "./drizzle/asset.schema";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { AssetMapper } from "./asset.mappers";
 import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "../domain/asset.types";
@@ -19,14 +19,14 @@ export class AssetSqlRepository implements AssetRepository {
 	}
 
 	private buildWhere(userId: string, options?: AssetListFilters) {
-		const conditions = [eq(assetTable.userId, userId)];
+		const conditions = [eq(assetsTable.userId, userId)];
 
 		const searchValue = options?.search?.trim();
 
 		if (searchValue && searchValue.length > 0) {
 			const searchCondition = or(
-				ilike(assetTable.symbol, `%${searchValue}%`),
-				ilike(assetTable.name, `%${searchValue}%`),
+				ilike(assetsTable.symbol, `%${searchValue}%`),
+				ilike(assetsTable.name, `%${searchValue}%`),
 			);
 
 			if (searchCondition) {
@@ -35,14 +35,14 @@ export class AssetSqlRepository implements AssetRepository {
 		}
 
 		if (options?.type) {
-			conditions.push(eq(assetTable.asset_type, options.type));
+			conditions.push(eq(assetsTable.asset_type, options.type));
 		}
 
 		return conditions.length ? and(...conditions) : undefined;
 	}
 
 	async findById(id: string): Promise<AssetEntity | null> {
-		const rows = await this.db.select().from(assetTable).where(eq(assetTable.id, id)).limit(1);
+		const rows = await this.db.select().from(assetsTable).where(eq(assetsTable.id, id)).limit(1);
 
 		return rows[0] ? AssetMapper.toEntity(rows[0]) : null;
 	}
@@ -55,10 +55,10 @@ export class AssetSqlRepository implements AssetRepository {
 
 		const [{ count }] = await this.db
 			.select({ count: sql<number>`count(*)` })
-			.from(assetTable)
+			.from(assetsTable)
 			.where(where);
 
-		const query = this.db.select().from(assetTable).where(where);
+		const query = this.db.select().from(assetsTable).where(where);
 
 		const rows =
 			options?.limit && options.limit > 0 ? await query.limit(options.limit).offset(options.offset ?? 0) : await query;
@@ -73,7 +73,7 @@ export class AssetSqlRepository implements AssetRepository {
 		const now = this.now();
 
 		const [row] = await this.db
-			.insert(assetTable)
+			.insert(assetsTable)
 			.values({
 				id: uuidv4(),
 				userId: input.userId,
@@ -95,12 +95,12 @@ export class AssetSqlRepository implements AssetRepository {
 		const now = this.now();
 
 		const [row] = await this.db
-			.update(assetTable)
+			.update(assetsTable)
 			.set({
 				...input,
 				updatedAt: now,
 			})
-			.where(eq(assetTable.id, id))
+			.where(eq(assetsTable.id, id))
 			.returning();
 
 		if (!row) {
@@ -111,6 +111,6 @@ export class AssetSqlRepository implements AssetRepository {
 	}
 
 	async delete(id: string): Promise<void> {
-		await this.db.delete(assetTable).where(eq(assetTable.id, id)).returning();
+		await this.db.delete(assetsTable).where(eq(assetsTable.id, id)).returning();
 	}
 }

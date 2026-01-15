@@ -1,7 +1,7 @@
 import { usersTable } from "@shared/database/drizzle/schema";
 import { bigint, index, pgTable, varchar } from "drizzle-orm/pg-core";
 
-export const assetTable = pgTable(
+export const assetsTable = pgTable(
 	"assets",
 	{
 		id: varchar("id", { length: 36 }).primaryKey(),

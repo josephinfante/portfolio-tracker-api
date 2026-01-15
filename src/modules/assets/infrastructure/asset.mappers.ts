@@ -1,8 +1,8 @@
 import { AssetEntity } from "../domain/asset.entity";
-import { assetTable } from "./drizzle/asset.schema";
+import { assetsTable } from "./drizzle/asset.schema";
 
 export class AssetMapper {
-	static toEntity(row: typeof assetTable.$inferSelect): AssetEntity {
+	static toEntity(row: typeof assetsTable.$inferSelect): AssetEntity {
 		return {
 			id: row.id,
 			userId: row.userId,
@@ -17,7 +17,7 @@ export class AssetMapper {
 		};
 	}
 
-	static toEntityList(rows: (typeof assetTable.$inferSelect)[]): AssetEntity[] {
+	static toEntityList(rows: (typeof assetsTable.$inferSelect)[]): AssetEntity[] {
 		return rows.map((row) => this.toEntity(row));
 	}
 
