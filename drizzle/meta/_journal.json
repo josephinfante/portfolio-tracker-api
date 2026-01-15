@@ -29,6 +29,20 @@
       "when": 1768411715080,
       "tag": "0003_real_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1768426917949,
+      "tag": "0004_heavy_meteorite",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1768487045226,
+      "tag": "0005_outgoing_living_mummy",
+      "breakpoints": true
     }
   ]
 }

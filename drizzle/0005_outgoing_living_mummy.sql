@@ -1,0 +1,1 @@
+ALTER TABLE "transactions" ALTER COLUMN "currency_code" SET DATA TYPE varchar(10);
