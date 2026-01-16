@@ -76,7 +76,6 @@ export class AssetPriceSqlRepository implements AssetPriceRepository {
 			priceAt: assetPrice.priceAt,
 			createdAt: now,
 		}));
-		console.log(rows);
 		await this.db
 			.insert(assetPricesTable)
 			.values(rows)

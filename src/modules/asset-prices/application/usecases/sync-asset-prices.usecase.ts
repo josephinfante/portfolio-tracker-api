@@ -5,16 +5,21 @@ import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/provide
 import {
 	buildPriceInputs,
 	getProviderSymbolForAsset,
-	isTwelveDataQuoteResponse,
+	normalizeTwelveDataQuoteResponse,
 	requestProviderQuotes,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
+import {
+	AssetPriceProvider,
+	TwelveDataQuoteResponse,
+} from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
 import { TOKENS } from "@shared/container/tokens";
 import { logger } from "@shared/logger";
 import { inject, injectable } from "tsyringe";
 
 @injectable()
 export class SyncAssetPricesUseCase {
-	private priceProvider = new TwelvedataProvider();
+	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new TwelvedataProvider();
 
 	constructor(@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository) {}
 
@@ -39,8 +44,9 @@ export class SyncAssetPricesUseCase {
 		if (symbols.length) {
 			try {
 				const data = await requestProviderQuotes(this.priceProvider, symbols);
-				if (isTwelveDataQuoteResponse(data)) {
-					results.push(...buildPriceInputs(this.priceProvider, allowedAssets, data));
+				const normalized = normalizeTwelveDataQuoteResponse(data);
+				if (normalized) {
+					results.push(...buildPriceInputs(this.priceProvider, allowedAssets, normalized));
 				} else if (data) {
 					logger.warn("Price provider returned invalid data");
 				} else {
@@ -51,7 +57,6 @@ export class SyncAssetPricesUseCase {
 			}
 		}
 
-		console.log("RESULTS", results);
 		return results;
 	}
 }
