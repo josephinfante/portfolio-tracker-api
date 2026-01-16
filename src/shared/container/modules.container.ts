@@ -12,6 +12,8 @@ import { registerUserModule } from "@modules/users";
 import { createApiUserRoutes } from "@modules/users/infrastructure/http/api.routes";
 import { registerExchangeRateModule } from "@modules/exchange-rates";
 import { createExchangeRateApiRoutes } from "@modules/exchange-rates/infrastructure/http/api.routes";
+import { registerAssetPriceModule } from "@modules/asset-prices";
+import { createAssetPriceApiRoutes } from "@modules/asset-prices/infrastructure/http/api.routes";
 import { Router } from "express";
 
 export function registerAllModules() {
@@ -22,6 +24,7 @@ export function registerAllModules() {
 	registerAssetModule();
 	registerTransactionModule();
 	registerExchangeRateModule();
+	registerAssetPriceModule();
 }
 
 export function getModuleRouters(): { path: string; router: Router }[] {
@@ -33,5 +36,6 @@ export function getModuleRouters(): { path: string; router: Router }[] {
 		{ path: "/api/assets", router: createAssetApiRoutes() },
 		{ path: "/api/transactions", router: createTransactionApiRoutes() },
 		{ path: "/api/exchange-rates", router: createExchangeRateApiRoutes() },
+		{ path: "/api/asset-prices", router: createAssetPriceApiRoutes() },
 	];
 }

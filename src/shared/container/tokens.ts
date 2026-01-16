@@ -5,6 +5,7 @@ export const TOKENS = {
 	AssetRepository: Symbol.for("AssetRepository"),
 	TransactionRepository: Symbol.for("TransactionRepository"),
 	ExchangeRateRepository: Symbol.for("ExchangeRateRepository"),
+	AssetPriceRepository: Symbol.for("AssetPriceRepository"),
 
 	CacheService: Symbol.for("CacheService"),
 	RedisClient: Symbol.for("RedisClient"),
