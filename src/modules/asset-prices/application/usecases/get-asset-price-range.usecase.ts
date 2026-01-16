@@ -129,7 +129,6 @@ export class GetAssetPriceRangeUseCase {
 		if (start > end) {
 			throw new ValidationError("startAt cannot be greater than endAt", "startAt");
 		}
-		console.log("NOW", now, "START", start, "END", end);
 		return { start, end };
 	}
 

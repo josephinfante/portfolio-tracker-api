@@ -87,7 +87,6 @@ export class GetFxUsdToBaseUseCase {
 		const quoteItem = getQuoteItem(data, symbol);
 		const close = quoteItem ? toNumber(quoteItem.close) : undefined;
 
-		console.log({ symbol, data, quoteItem, close });
 		if (!close) {
 			throw new ValidationError("Unable to resolve FX rate", "baseCurrency");
 		}
