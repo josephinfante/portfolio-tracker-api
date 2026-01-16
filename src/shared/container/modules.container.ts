@@ -14,6 +14,8 @@ import { registerExchangeRateModule } from "@modules/exchange-rates";
 import { createExchangeRateApiRoutes } from "@modules/exchange-rates/infrastructure/http/api.routes";
 import { registerAssetPriceModule } from "@modules/asset-prices";
 import { createAssetPriceApiRoutes } from "@modules/asset-prices/infrastructure/http/api.routes";
+import { createPortfolioSnapshotApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/api.routes";
+import { registerPortfolioSnapshotModule } from "@modules/portfolio-snapshots";
 import { Router } from "express";
 
 export function registerAllModules() {
@@ -25,6 +27,7 @@ export function registerAllModules() {
 	registerTransactionModule();
 	registerExchangeRateModule();
 	registerAssetPriceModule();
+	registerPortfolioSnapshotModule();
 }
 
 export function getModuleRouters(): { path: string; router: Router }[] {
@@ -37,5 +40,6 @@ export function getModuleRouters(): { path: string; router: Router }[] {
 		{ path: "/api/transactions", router: createTransactionApiRoutes() },
 		{ path: "/api/exchange-rates", router: createExchangeRateApiRoutes() },
 		{ path: "/api/asset-prices", router: createAssetPriceApiRoutes() },
+		{ path: "/api/portfolio-snapshots", router: createPortfolioSnapshotApiRoutes() },
 	];
 }
