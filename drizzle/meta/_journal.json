@@ -71,6 +71,20 @@
       "when": 1768541937545,
       "tag": "0009_swift_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1768583706227,
+      "tag": "0010_wise_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1768584305801,
+      "tag": "0011_groovy_darkhawk",
+      "breakpoints": true
     }
   ]
 }
