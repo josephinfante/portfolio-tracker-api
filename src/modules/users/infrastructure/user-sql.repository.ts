@@ -42,6 +42,7 @@ export class UserSqlRepository implements UserRepository {
 				lastName: input.lastName,
 				email: input.email,
 				passwordHash: input.password,
+				baseCurrency: input.baseCurrency ?? "USD",
 
 				createdAt: now,
 				updatedAt: now,

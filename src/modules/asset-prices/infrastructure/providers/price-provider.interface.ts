@@ -30,9 +30,7 @@ export interface TwelveDataQuoteFiftyTwoWeek {
 	range: string;
 }
 
-export interface TwelveDataQuoteResponse {
-	[symbol: string]: TwelveDataQuoteItem;
-}
+export type TwelveDataQuoteResponse = TwelveDataQuoteItem | { [symbol: string]: TwelveDataQuoteItem };
 
 export interface TwelveDataHistoricalMeta {
 	symbol: string;

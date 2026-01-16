@@ -13,7 +13,7 @@ export class TwelvedataProvider implements AssetPriceProvider<TwelveDataResponse
 	async getQuote(assetsSymbol: string[]): Promise<TwelveDataQuoteResponse | null> {
 		try {
 			const { data } = await axios.get(
-				`https://api.twelvedata.com/quote?symbol=${assetsSymbol.join(",")}&interval=1min&apikey=${environment.STOCK_PROVIDER_API_KEY}`,
+				`https://api.twelvedata.com/quote?symbol=${assetsSymbol.join(",")}&interval=1min&apikey=${environment.ASSETPRICE_PROVIDER_API_KEY}`,
 			);
 			return data;
 		} catch (error) {
@@ -38,7 +38,7 @@ export class TwelvedataProvider implements AssetPriceProvider<TwelveDataResponse
 			const endStr = endDate.toISOString().split(".")[0];
 
 			const { data } = await axios.get(
-				`https://api.twelvedata.com/time_series?symbol=${assetSymbol}&interval=1day&start_date=${startStr}&end_date=${endStr}&apikey=${environment.STOCK_PROVIDER_API_KEY}`,
+				`https://api.twelvedata.com/time_series?symbol=${assetSymbol}&interval=1day&start_date=${startStr}&end_date=${endStr}&apikey=${environment.ASSETPRICE_PROVIDER_API_KEY}`,
 			);
 			return data;
 		} catch (error) {

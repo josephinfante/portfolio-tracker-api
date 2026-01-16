@@ -9,6 +9,7 @@ export class UserMapper {
 			lastName: row.lastName,
 			email: row.email,
 			passwordHash: row.passwordHash,
+			baseCurrency: row.baseCurrency,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 		};

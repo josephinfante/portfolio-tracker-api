@@ -40,6 +40,6 @@ export class AssetPriceController {
 		}
 
 		await this.assetPriceService.upsertAssetPrices(payloads);
-		return res.status(200).success({ synced: payloads.length });
+		return res.status(200).success({ synced: payloads });
 	});
 }

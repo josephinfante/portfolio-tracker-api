@@ -7,8 +7,9 @@ import { ReverseTransactionUseCase } from "./usecases/reverse-transaction.usecas
 import { TransferAssetUseCase } from "./usecases/transfer-asset.usecase";
 import { ExchangeAssetUseCase } from "./usecases/exchange-asset.usecase";
 import { MoveAssetUseCase } from "./usecases/move-asset.usecase";
+import { GetHoldingsByAccountUseCase } from "./usecases/get-holdings-by-account.usecase";
 import { TransactionEntity } from "../domain/transaction.entity";
-import { TransactionListFilters } from "../domain/transaction.types";
+import { Holding, TransactionListFilters } from "../domain/transaction.types";
 import { PaginatedResponse } from "@shared/types/paginated-response";
 
 @injectable()
@@ -22,6 +23,7 @@ export class TransactionService {
 		private transferAssetUseCase: TransferAssetUseCase,
 		private exchangeAssetUseCase: ExchangeAssetUseCase,
 		private moveAssetUseCase: MoveAssetUseCase,
+		private getHoldingsByAccountUseCase: GetHoldingsByAccountUseCase,
 	) {}
 
 	async createTransaction(userId: string, input: unknown): Promise<TransactionEntity> {
@@ -57,5 +59,9 @@ export class TransactionService {
 
 	async moveAsset(userId: string, input: unknown): Promise<TransactionEntity> {
 		return await this.moveAssetUseCase.execute(userId, input);
+	}
+
+	async getHoldingsByAccount(userId: string): Promise<Holding[]> {
+		return await this.getHoldingsByAccountUseCase.execute(userId);
 	}
 }

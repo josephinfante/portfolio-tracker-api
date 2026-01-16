@@ -4,6 +4,7 @@ import { AssetPriceLiveCache, CreateAssetPriceInput } from "@modules/asset-price
 import {
 	AssetPriceProvider,
 	AssetPriceProviderResponseMap,
+	TwelveDataQuoteItem,
 	TwelveDataQuoteResponse,
 } from "./price-provider.interface";
 
@@ -54,6 +55,22 @@ type QuoteProvider = AssetPriceProvider<{ quote: TwelveDataQuoteResponse; histor
 export const isTwelveDataQuoteResponse = (value: unknown): value is TwelveDataQuoteResponse =>
 	typeof value === "object" && value !== null;
 
+type TwelveDataQuoteMap = Record<string, TwelveDataQuoteItem>;
+
+export const normalizeTwelveDataQuoteResponse = (
+	data: TwelveDataQuoteResponse | null,
+): TwelveDataQuoteMap | null => {
+	if (!data || typeof data !== "object") {
+		return null;
+	}
+
+	if ("close" in data && "symbol" in data && typeof data.symbol === "string") {
+		return { [data.symbol]: data as TwelveDataQuoteItem };
+	}
+
+	return data as TwelveDataQuoteMap;
+};
+
 export const getProviderSymbolForAsset = (asset: AssetEntity): string => {
 	if (asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin) {
 		return `${asset.symbol}/USD`;
@@ -69,7 +86,8 @@ export function buildLivePriceCaches(
 	assets: AssetEntity[],
 	data: TwelveDataQuoteResponse | null,
 ): AssetPriceLiveCache[] {
-	if (!data || typeof data !== "object") {
+	const normalized = normalizeTwelveDataQuoteResponse(data);
+	if (!normalized) {
 		return [];
 	}
 
@@ -77,7 +95,7 @@ export function buildLivePriceCaches(
 		assets.map((asset) => [normalizeSymbol(getProviderSymbolForAsset(asset)), asset]),
 	);
 
-	return Object.entries(data).reduce<AssetPriceLiveCache[]>((acc, [key, item]) => {
+	return Object.entries(normalized).reduce<AssetPriceLiveCache[]>((acc, [key, item]) => {
 		if (!item || typeof item !== "object") {
 			return acc;
 		}
@@ -136,7 +154,8 @@ export function buildPriceInputs(
 	assets: AssetEntity[],
 	data: TwelveDataQuoteResponse | null,
 ): CreateAssetPriceInput[] {
-	if (!data || typeof data !== "object") {
+	const normalized = normalizeTwelveDataQuoteResponse(data);
+	if (!normalized) {
 		return [];
 	}
 
@@ -144,7 +163,7 @@ export function buildPriceInputs(
 		assets.map((asset) => [normalizeSymbol(getProviderSymbolForAsset(asset)), asset]),
 	);
 	const now = Date.now();
-	return Object.entries(data).reduce<CreateAssetPriceInput[]>((acc, [key, item]) => {
+	return Object.entries(normalized).reduce<CreateAssetPriceInput[]>((acc, [key, item]) => {
 		if (!item || typeof item !== "object") {
 			return acc;
 		}

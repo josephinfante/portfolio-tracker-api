@@ -29,3 +29,9 @@ export interface FindExchangeRatesResponse {
 	}[];
 	totalCount: number;
 }
+
+export type FxRate = {
+	baseCurrency: string; // PEN, EUR...
+	fxUsdToBase: number; // decimal
+	asOf: Date;
+};

@@ -18,6 +18,12 @@ export enum TransactionType {
 	ADJUSTMENT = "adjustment",
 }
 
+export type Holding = {
+	accountId: string;
+	assetId: string;
+	quantity: number; // decimal
+};
+
 export enum TransactionCorrectionType {
 	REVERSE = "reverse",
 	ADJUST = "adjust",

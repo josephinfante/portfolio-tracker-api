@@ -3,6 +3,7 @@ export interface CreateUserInput {
 	lastName: string;
 	email: string;
 	password: string;
+	baseCurrency?: string;
 }
 
 export interface UserName {

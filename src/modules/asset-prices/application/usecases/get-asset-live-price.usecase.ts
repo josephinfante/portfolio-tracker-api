@@ -6,7 +6,7 @@ import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/provide
 import {
 	buildLivePriceCaches,
 	getProviderSymbolForAsset,
-	isTwelveDataQuoteResponse,
+	normalizeTwelveDataQuoteResponse,
 	requestProviderQuotes,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { AssetPriceLiveCacheStore } from "@modules/asset-prices/infrastructure/cache/asset-price-live.cache";
@@ -15,6 +15,10 @@ import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { RedisClient } from "@shared/redis/redis.client";
 import { inject, injectable } from "tsyringe";
+import {
+	AssetPriceProvider,
+	TwelveDataQuoteResponse,
+} from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
 
 const allowedTypes = new Set([AssetType.crypto, AssetType.stablecoin, AssetType.fiat, AssetType.stock, AssetType.etf]);
 
@@ -23,7 +27,8 @@ const normalizeIdentifiers = (assets: string[]) =>
 
 @injectable()
 export class GetAssetLivePriceUseCase {
-	private priceProvider = new TwelvedataProvider();
+	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new TwelvedataProvider();
 	private cacheStore: AssetPriceLiveCacheStore;
 
 	constructor(
@@ -77,12 +82,12 @@ export class GetAssetLivePriceUseCase {
 
 		const symbols = found.map((asset) => getProviderSymbolForAsset(asset));
 		const data = await requestProviderQuotes(this.priceProvider, symbols);
-
-		if (!isTwelveDataQuoteResponse(data)) {
+		const normalized = normalizeTwelveDataQuoteResponse(data);
+		if (!normalized) {
 			return { items: [], totalCount: 0 };
 		}
 
-		const caches = buildLivePriceCaches(this.priceProvider, found, data);
+		const caches = buildLivePriceCaches(this.priceProvider, found, normalized);
 		if (caches.length) {
 			await this.cacheStore.setMany(caches);
 		}
