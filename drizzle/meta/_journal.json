@@ -57,6 +57,20 @@
       "when": 1768503213813,
       "tag": "0007_good_black_bird",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1768512602009,
+      "tag": "0008_spooky_rhodey",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1768541937545,
+      "tag": "0009_swift_morlun",
+      "breakpoints": true
     }
   ]
 }
