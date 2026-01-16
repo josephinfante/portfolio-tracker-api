@@ -5,6 +5,7 @@ import { logger } from "@shared/logger";
 import { RedisClient } from "@shared/redis/redis.client";
 import { container } from "tsyringe";
 import { startExchangeRateCron } from "@modules/exchange-rates/infrastructure/cron/exchange-rate.cron";
+import { startAssetPriceCron } from "@modules/asset-prices/infrastructure/cron/asset-price.cron";
 
 export async function startServer() {
 	const app = createApp();
@@ -17,6 +18,7 @@ export async function startServer() {
 	});
 
 	startExchangeRateCron();
+	startAssetPriceCron();
 
 	const shutdown = async () => {
 		logger.info("Shutting down gracefully...");

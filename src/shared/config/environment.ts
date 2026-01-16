@@ -16,6 +16,7 @@ export interface IEnvironmentVariables {
 	JWT_SECRET: string;
 	DB_URL: string;
 	REDIS_URL: string;
+	ASSETPRICE_PROVIDER_API_KEY: string;
 }
 
 const environmentSchema = z.object({
@@ -51,6 +52,7 @@ const environmentSchema = z.object({
 				return false;
 			}
 		}, "REDIS_URL must be a valid Redis URL"),
+	ASSETPRICE_PROVIDER_API_KEY: z.string().min(1, "ASSETPRICE_PROVIDER_API_KEY is required"),
 });
 
 const result = environmentSchema.safeParse(process.env);

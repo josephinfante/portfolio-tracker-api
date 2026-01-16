@@ -17,7 +17,6 @@ export interface AssetListFilters {
 }
 
 export interface CreateAssetInput {
-	userId: string;
 	symbol: string;
 	name: string;
 	asset_type: AssetType;
@@ -26,4 +25,4 @@ export interface CreateAssetInput {
 	quote_currency: string | null;
 }
 
-export type UpdateAssetInput = Partial<Omit<CreateAssetInput, "userId">>;
+export type UpdateAssetInput = Partial<CreateAssetInput>;

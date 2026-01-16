@@ -1,6 +1,5 @@
 import { AssetRepository } from "@modules/assets/domain/asset.repository";
 import { TOKENS } from "@shared/container/tokens";
-import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
 import { AssetListFilters, AssetType } from "@modules/assets/domain/asset.types";
 import { PaginatedResponse } from "@shared/types/paginated-response";
@@ -13,11 +12,7 @@ const assetTypeValues = new Set(Object.values(AssetType));
 export class ListAssetsUseCase {
 	constructor(@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository) {}
 
-	async execute(userId: string, options?: AssetListFilters): Promise<PaginatedResponse<AssetEntity>> {
-		if (!userId || typeof userId !== "string") {
-			throw new ValidationError("Invalid user ID", "userId");
-		}
-
+	async execute(options?: AssetListFilters): Promise<PaginatedResponse<AssetEntity>> {
 		const rawLimit = options?.limit;
 		const parsedLimit = typeof rawLimit === "string" ? Number(rawLimit) : rawLimit;
 		const limit =
@@ -35,7 +30,7 @@ export class ListAssetsUseCase {
 
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
-		const { items, totalCount } = await this.assetRepository.findByUserId(userId, {
+		const { items, totalCount } = await this.assetRepository.findAll({
 			limit,
 			offset: sqlOffset,
 			search,

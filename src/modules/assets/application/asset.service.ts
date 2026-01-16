@@ -18,23 +18,23 @@ export class AssetService {
 		private findAssetUseCase: FindAssetUseCase,
 	) {}
 
-	async createAsset(userId: string, input: unknown): Promise<AssetEntity> {
-		return await this.createAssetUseCase.execute(userId, input);
+	async createAsset(input: unknown): Promise<AssetEntity> {
+		return await this.createAssetUseCase.execute(input);
 	}
 
-	async updateAsset(id: string, userId: string, input: unknown): Promise<AssetEntity> {
-		return await this.updateAssetUseCase.execute(id, userId, input);
+	async updateAsset(id: string, input: unknown): Promise<AssetEntity> {
+		return await this.updateAssetUseCase.execute(id, input);
 	}
 
-	async deleteAsset(id: string, userId: string): Promise<void> {
-		await this.deleteAssetUseCase.execute(id, userId);
+	async deleteAsset(id: string): Promise<void> {
+		await this.deleteAssetUseCase.execute(id);
 	}
 
-	async listAssets(userId: string, options?: AssetListFilters): Promise<PaginatedResponse<AssetEntity>> {
-		return await this.listAssetsUseCase.execute(userId, options);
+	async listAssets(options?: AssetListFilters): Promise<PaginatedResponse<AssetEntity>> {
+		return await this.listAssetsUseCase.execute(options);
 	}
 
-	async findAsset(id: string, userId: string): Promise<AssetEntity> {
-		return await this.findAssetUseCase.execute(id, userId);
+	async findAsset(id: string): Promise<AssetEntity> {
+		return await this.findAssetUseCase.execute(id);
 	}
 }

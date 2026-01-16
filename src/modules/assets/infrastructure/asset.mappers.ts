@@ -5,7 +5,6 @@ export class AssetMapper {
 	static toEntity(row: typeof assetsTable.$inferSelect): AssetEntity {
 		return {
 			id: row.id,
-			userId: row.userId,
 			symbol: row.symbol,
 			name: row.name,
 			asset_type: row.asset_type as AssetEntity["asset_type"],
@@ -24,7 +23,6 @@ export class AssetMapper {
 	static toPersistence(entity: AssetEntity) {
 		return {
 			id: entity.id,
-			userId: entity.userId,
 			symbol: entity.symbol,
 			name: entity.name,
 			asset_type: entity.asset_type,

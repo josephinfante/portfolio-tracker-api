@@ -2,7 +2,6 @@ import { AssetType } from "./asset.types";
 
 export interface AssetEntity {
 	id: string;
-	userId: string;
 
 	symbol: string;
 	name: string;

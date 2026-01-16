@@ -8,35 +8,30 @@ export class AssetController {
 	constructor(private readonly assetService: AssetService) {}
 
 	create = asyncHandler(async (req: Request, res: Response) => {
-		const userId = res.locals.user.id;
-		const response = await this.assetService.createAsset(userId, req.body);
+		const response = await this.assetService.createAsset(req.body);
 		return res.status(201).success(response);
 	});
 
 	list = asyncHandler(async (req: Request, res: Response) => {
-		const userId = res.locals.user.id;
-		const { meta, ...response } = await this.assetService.listAssets(userId, req.query);
+		const { meta, ...response } = await this.assetService.listAssets(req.query);
 		return res.status(200).success(response, meta);
 	});
 
 	findById = asyncHandler(async (req: Request, res: Response) => {
-		const userId = res.locals.user.id;
 		const id = req.params.id as string;
-		const response = await this.assetService.findAsset(id, userId);
+		const response = await this.assetService.findAsset(id);
 		return res.status(200).success(response);
 	});
 
 	update = asyncHandler(async (req: Request, res: Response) => {
-		const userId = res.locals.user.id;
 		const id = req.params.id as string;
-		const response = await this.assetService.updateAsset(id, userId, req.body);
+		const response = await this.assetService.updateAsset(id, req.body);
 		return res.status(200).success(response);
 	});
 
 	remove = asyncHandler(async (req: Request, res: Response) => {
-		const userId = res.locals.user.id;
 		const id = req.params.id as string;
-		await this.assetService.deleteAsset(id, userId);
+		await this.assetService.deleteAsset(id);
 		return res.status(200).success(null);
 	});
 }

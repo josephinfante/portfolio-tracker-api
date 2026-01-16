@@ -21,7 +21,6 @@ export class SignUpUseCase {
 		// Zod validation
 		const result = SignUpSchema.safeParse(input);
 		if (!result.success) {
-			console.log(result.error);
 			throw new ValidationError("Invalid user data", undefined, undefined, {
 				context: { errors: zodErrorMapper(result.error) },
 			});

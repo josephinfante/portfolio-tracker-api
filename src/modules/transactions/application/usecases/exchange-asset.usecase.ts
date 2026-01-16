@@ -49,7 +49,6 @@ export class ExchangeAssetUseCase {
 			throw new BusinessLogicError("Exchange requires different assets");
 		}
 
-
 		const [fromAccount, toAccount] = await Promise.all([
 			this.accountRepository.findById(data.fromAccountId),
 			this.accountRepository.findById(data.toAccountId),
@@ -80,10 +79,6 @@ export class ExchangeAssetUseCase {
 			throw new NotFoundError(`Asset ${data.toAssetId} not found`);
 		}
 
-		if (fromAsset.userId !== userId || toAsset.userId !== userId) {
-			throw new AuthorizationError("Access denied");
-		}
-
 		this.assertAccountSupportsAsset(fromAccount, fromAsset, "source");
 		this.assertAccountSupportsAsset(toAccount, toAsset, "destination");
 
@@ -96,33 +91,22 @@ export class ExchangeAssetUseCase {
 			throw new NotFoundError(`Asset ${data.fee.assetId} not found`);
 		}
 
-		if (feeAsset && feeAsset.userId !== userId) {
-			throw new AuthorizationError("Access denied");
-		}
-
 		if (feeAsset) {
 			this.assertAccountSupportsAsset(fromAccount, feeAsset, "source");
 		}
 
-		const fromBalance = await this.transactionRepository.getAssetBalance(
-			userId,
-			data.fromAccountId,
-			data.fromAssetId,
-		);
+		const fromBalance = await this.transactionRepository.getAssetBalance(userId, data.fromAccountId, data.fromAssetId);
 
 		const feeAmount = data.fee?.amount ?? 0;
-		const requiredFromBalance = data.fee?.assetId === data.fromAssetId ? data.fromQuantity + feeAmount : data.fromQuantity;
+		const requiredFromBalance =
+			data.fee?.assetId === data.fromAssetId ? data.fromQuantity + feeAmount : data.fromQuantity;
 
 		if (fromBalance < requiredFromBalance) {
 			throw new BusinessLogicError("Insufficient balance for exchange");
 		}
 
 		if (data.fee && data.fee.assetId !== data.fromAssetId) {
-			const feeBalance = await this.transactionRepository.getAssetBalance(
-				userId,
-				data.fromAccountId,
-				data.fee.assetId,
-			);
+			const feeBalance = await this.transactionRepository.getAssetBalance(userId, data.fromAccountId, data.fee.assetId);
 
 			if (feeBalance < data.fee.amount) {
 				throw new BusinessLogicError("Insufficient balance for fee");
