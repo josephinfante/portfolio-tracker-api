@@ -4,7 +4,7 @@ import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { AssetEntity } from "../domain/asset.entity";
 import { assetsTable } from "./drizzle/asset.schema";
-import { and, eq, ilike, or, sql, SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql, SQL } from "drizzle-orm";
 import { AssetMapper } from "./asset.mappers";
 import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "../domain/asset.types";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
@@ -69,6 +69,25 @@ export class AssetSqlRepository implements AssetRepository {
 			items: AssetMapper.toEntityList(rows),
 			totalCount: Number(count ?? 0),
 		};
+	}
+
+	async findByIdentifiers(identifiers: string[]): Promise<AssetEntity[]> {
+		const normalized = identifiers
+			.map((value) => value.trim())
+			.filter((value) => value.length > 0);
+
+		if (!normalized.length) {
+			return [];
+		}
+
+		const conditions = or(
+			inArray(assetsTable.id, normalized),
+			inArray(assetsTable.symbol, normalized),
+			inArray(assetsTable.name, normalized),
+		);
+
+		const rows = conditions ? await this.db.select().from(assetsTable).where(conditions) : [];
+		return AssetMapper.toEntityList(rows);
 	}
 
 	async create(input: CreateAssetInput): Promise<AssetEntity> {
