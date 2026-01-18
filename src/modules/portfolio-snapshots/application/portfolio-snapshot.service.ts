@@ -14,8 +14,8 @@ export class PortfolioSnapshotService {
 		private findSnapshotByIdUseCase: FindSnapshotByIdUseCase,
 	) {}
 
-	async createTodaySnapshot(userId: string): Promise<BuiltSnapshot> {
-		return await this.createTodaySnapshotUseCase.execute(userId);
+	async createTodaySnapshot(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
+		return await this.createTodaySnapshotUseCase.execute(userId, timeZone);
 	}
 
 	async findSnapshots(userId: string, options?: SnapshotListFilters) {

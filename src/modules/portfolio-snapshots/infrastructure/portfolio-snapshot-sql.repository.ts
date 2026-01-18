@@ -46,9 +46,9 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			id: row.id,
 			userId: row.userId,
 			snapshotDate: row.snapshotDate,
-			fxUsdToBase: toNumber(row.fxUsdToBase),
-			totalValueUsd: toNumber(row.totalValueUsd),
-			totalValueBase: toNumber(row.totalValueBase),
+			fxUsdToBase: row.fxUsdToBase.toString(),
+			totalValueUsd: row.totalValueUsd.toString(),
+			totalValueBase: row.totalValueBase.toString(),
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 		};
@@ -99,9 +99,9 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 				id: uuidv4(),
 				userId: input.userId,
 				snapshotDate: input.snapshotDate,
-				fxUsdToBase: input.fxUsdToBase,
-				totalValueUsd: input.totalValueUsd,
-				totalValueBase: input.totalValueBase,
+				fxUsdToBase: input.fxUsdToBase.toString(),
+				totalValueUsd: input.totalValueUsd.toString(),
+				totalValueBase: input.totalValueBase.toString(),
 				createdAt: now,
 				updatedAt: now,
 			})
@@ -121,9 +121,9 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		const [row] = await db
 			.update(portfolioSnapshotsTable)
 			.set({
-				fxUsdToBase: input.fxUsdToBase,
-				totalValueUsd: input.totalValueUsd,
-				totalValueBase: input.totalValueBase,
+				fxUsdToBase: input.fxUsdToBase.toString(),
+				totalValueUsd: input.totalValueUsd.toString(),
+				totalValueBase: input.totalValueBase.toString(),
 				updatedAt: now,
 			})
 			.where(eq(portfolioSnapshotsTable.id, id))
@@ -156,11 +156,11 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 				snapshotId,
 				accountId: item.accountId,
 				assetId: item.assetId,
-				quantity: item.quantity,
-				priceUsd: item.priceUsd,
-				priceBase: item.priceBase,
-				valueUsd: item.valueUsd,
-				valueBase: item.valueBase,
+				quantity: item.quantity.toString(),
+				priceUsd: item.priceUsd.toString(),
+				priceBase: item.priceBase.toString(),
+				valueUsd: item.valueUsd.toString(),
+				valueBase: item.valueBase.toString(),
 				createdAt: now,
 			})),
 		);
@@ -178,9 +178,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			.where(where);
 
 		const order =
-			options?.order === "ASC"
-				? asc(portfolioSnapshotsTable.snapshotDate)
-				: desc(portfolioSnapshotsTable.snapshotDate);
+			options?.order === "ASC" ? asc(portfolioSnapshotsTable.snapshotDate) : desc(portfolioSnapshotsTable.snapshotDate);
 
 		const baseQuery = this.db.select().from(portfolioSnapshotsTable).where(where).orderBy(order);
 

@@ -4,8 +4,9 @@ import { GetFxUsdToBaseUseCase } from "@modules/exchange-rates/application/useca
 import { BuiltSnapshot } from "@modules/portfolio-snapshots/domain/portfolio-snapshot.entity";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { injectable } from "tsyringe";
-
-const toDateString = (value: Date): string => value.toISOString().slice(0, 10);
+import { D, toFixed } from "@shared/helpers/decimal";
+import { DateTime } from "luxon";
+import { getTodayInTimezone } from "@shared/helpers/date";
 
 @injectable()
 export class BuildSnapshotUseCase {
@@ -15,7 +16,7 @@ export class BuildSnapshotUseCase {
 		private getFxUsdToBaseUseCase: GetFxUsdToBaseUseCase,
 	) {}
 
-	async execute(userId: string): Promise<BuiltSnapshot> {
+	async execute(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
 		if (!userId || typeof userId !== "string") {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
@@ -25,7 +26,8 @@ export class BuildSnapshotUseCase {
 			this.getFxUsdToBaseUseCase.execute(userId),
 		]);
 
-		const snapshotDate = toDateString(new Date());
+		const resolvedTimeZone = timeZone && typeof timeZone === "string" ? timeZone : DateTime.local().zoneName;
+		const snapshotDate = getTodayInTimezone(resolvedTimeZone);
 		const baseCurrencyCode = fxRate.baseCurrency;
 		const fxUsdToBase = fxRate.fxUsdToBase;
 
@@ -45,37 +47,37 @@ export class BuildSnapshotUseCase {
 
 		const priceMap = new Map(livePrices.items.map((item) => [item.assetId, item]));
 
-		let totalValueUsd = 0;
-		let totalValueBase = 0;
+		let totalValueUsd = D(0);
+		let totalValueBase = D(0);
 
 		const items = holdings.map((holding) => {
-			const quantity = holding.quantity;
+			const quantity = D(holding.quantity);
 			const priceItem = priceMap.get(holding.assetId);
 			const rawPrice = priceItem?.price ?? 0;
 			const quoteCurrency = priceItem?.quoteCurrency?.toUpperCase();
 
-			let priceUsd = rawPrice;
-			let priceBase = rawPrice * fxUsdToBase;
+			let priceUsd = D(rawPrice);
+			let priceBase = D(rawPrice).mul(D(fxUsdToBase));
 
 			if (quoteCurrency === baseCurrencyCode && fxUsdToBase > 0) {
-				priceBase = rawPrice;
-				priceUsd = rawPrice / fxUsdToBase;
+				priceBase = D(rawPrice);
+				priceUsd = D(rawPrice).div(D(fxUsdToBase));
 			}
 
-			const valueUsd = quantity * priceUsd;
-			const valueBase = quantity * priceBase;
+			const valueUsd = quantity.mul(priceUsd);
+			const valueBase = quantity.mul(priceBase);
 
-			totalValueUsd += valueUsd;
-			totalValueBase += valueBase;
+			totalValueUsd = totalValueUsd.plus(valueUsd);
+			totalValueBase = totalValueBase.plus(valueBase);
 
 			return {
 				accountId: holding.accountId,
 				assetId: holding.assetId,
-				quantity: quantity,
-				priceUsd: priceUsd,
-				priceBase: priceBase,
-				valueUsd: valueUsd,
-				valueBase: valueBase,
+				quantity: Number(toFixed(quantity)),
+				priceUsd: Number(toFixed(priceUsd)),
+				priceBase: Number(toFixed(priceBase)),
+				valueUsd: Number(toFixed(valueUsd)),
+				valueBase: Number(toFixed(valueBase)),
 			};
 		});
 
@@ -83,8 +85,8 @@ export class BuildSnapshotUseCase {
 			snapshotDate,
 			baseCurrencyCode,
 			fxUsdToBase: fxUsdToBase,
-			totalValueUsd: totalValueUsd,
-			totalValueBase: totalValueBase,
+			totalValueUsd: Number(toFixed(totalValueUsd)),
+			totalValueBase: Number(toFixed(totalValueBase)),
 			items,
 		};
 	}
