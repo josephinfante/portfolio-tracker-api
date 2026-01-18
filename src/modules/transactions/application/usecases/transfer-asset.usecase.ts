@@ -12,6 +12,9 @@ import { BusinessLogicError } from "@shared/errors/domain/business-logic.error";
 import { TransactionType } from "@modules/transactions/domain/transaction.types";
 import { AssetType } from "@modules/assets/domain/asset.types";
 import { PlatformTypes } from "@modules/platforms/domain/platform.types";
+import { D, toFixed } from "@shared/helpers/decimal";
+import { BalanceGuardService } from "../services/balance-guard.service";
+import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 
 const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
 
@@ -21,6 +24,7 @@ export class TransferAssetUseCase {
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -70,14 +74,6 @@ export class TransferAssetUseCase {
 		this.assertAccountSupportsAsset(fromAccount, asset, "source");
 		this.assertAccountSupportsAsset(toAccount, asset, "destination");
 
-		const balance = await this.transactionRepository.getAssetBalance(userId, data.fromAccountId, data.assetId);
-		const feeAmount = data.fee?.amount ?? 0;
-		const requiredBalance = data.fee?.assetId === data.assetId ? data.quantity + feeAmount : data.quantity;
-
-		if (balance < requiredBalance) {
-			throw new BusinessLogicError("Insufficient balance for transfer");
-		}
-
 		if (data.fee && data.fee.amount <= 0) {
 			throw new BusinessLogicError("Fee amount must be greater than 0");
 		}
@@ -91,6 +87,22 @@ export class TransferAssetUseCase {
 			this.assertAccountSupportsAsset(fromAccount, feeAsset, "source");
 		}
 
+		const deltas: BalanceDelta[] = [
+			{
+				accountId: data.fromAccountId,
+				assetId: data.assetId,
+				delta: D(data.quantity).neg().toNumber(),
+			},
+		];
+		if (data.fee) {
+			deltas.push({
+				accountId: data.fromAccountId,
+				assetId: data.fee.assetId,
+				delta: D(data.fee.amount).neg().toNumber(),
+			});
+		}
+		await this.balanceGuard.ensure(userId, deltas);
+
 		const transactionDate = data.transactionDate ?? Date.now();
 		const currencyCode = normalizeCurrencyCode(asset.symbol);
 
@@ -103,9 +115,9 @@ export class TransferAssetUseCase {
 					transactionType: TransactionType.TRANSFER_OUT,
 					correctionType: null,
 					referenceTxId: null,
-					quantity: (-data.quantity).toString(),
+					quantity: toFixed(D(data.quantity).neg()),
 					unitPrice: null,
-					totalAmount: (-data.quantity).toString(),
+					totalAmount: toFixed(D(data.quantity).neg()),
 					currencyCode,
 					exchangeRate: null,
 					transactionDate,
@@ -124,9 +136,9 @@ export class TransferAssetUseCase {
 						transactionType: TransactionType.FEE,
 						correctionType: null,
 						referenceTxId: transferOut.id,
-						quantity: (-data.fee.amount).toString(),
+						quantity: toFixed(D(data.fee.amount).neg()),
 						unitPrice: "1",
-						totalAmount: data.fee.amount.toString(),
+						totalAmount: toFixed(D(data.fee.amount)),
 						currencyCode: feeCurrencyCode,
 						exchangeRate: null,
 						transactionDate,
@@ -144,9 +156,9 @@ export class TransferAssetUseCase {
 					transactionType: TransactionType.TRANSFER_IN,
 					correctionType: null,
 					referenceTxId: transferOut.id,
-					quantity: data.quantity.toString(),
+					quantity: toFixed(D(data.quantity)),
 					unitPrice: null,
-					totalAmount: data.quantity.toString(),
+					totalAmount: toFixed(D(data.quantity)),
 					currencyCode,
 					exchangeRate: null,
 					transactionDate,

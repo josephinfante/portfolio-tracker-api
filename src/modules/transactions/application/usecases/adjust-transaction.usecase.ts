@@ -7,12 +7,18 @@ import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { AuthorizationError } from "@shared/errors/domain/authorization.error";
 import { TransactionCorrectionType, TransactionType } from "@modules/transactions/domain/transaction.types";
+import { D, toFixed } from "@shared/helpers/decimal";
+import { BalanceGuardService } from "../services/balance-guard.service";
+import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
 
 @injectable()
 export class AdjustTransactionUseCase {
-	constructor(@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository) {}
+	constructor(
+		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
+		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+	) {}
 
 	async execute(id: string, userId: string, input: unknown) {
 		if (!id || typeof id !== "string") {
@@ -46,28 +52,40 @@ export class AdjustTransactionUseCase {
 		}
 
 		if (data.quantity !== undefined) {
-			data.quantity = (data.quantity as number).toString();
+			data.quantity = toFixed(D(data.quantity as number));
 		}
 
 		if (data.unitPrice !== undefined) {
-			data.unitPrice = data.unitPrice === null ? null : (data.unitPrice as number).toString();
+			data.unitPrice = data.unitPrice === null ? null : toFixed(D(data.unitPrice as number));
 		}
 
 		if (data.totalAmount !== undefined) {
-			data.totalAmount = (data.totalAmount as number).toString();
+			data.totalAmount = toFixed(D(data.totalAmount as number));
 		}
 
 		if (data.exchangeRate !== undefined) {
-			data.exchangeRate = data.exchangeRate === null ? null : (data.exchangeRate as number).toString();
+			data.exchangeRate = data.exchangeRate === null ? null : toFixed(D(data.exchangeRate as number));
 		}
 
 		const current = {
 			...transaction,
 		};
 
-		const quantity = Number(data?.quantity ?? current.quantity);
-		const unitPrice = Number(data?.unitPrice ?? current.unitPrice);
-		const totalAmount = unitPrice ? quantity * unitPrice : quantity;
+		const quantityRaw = (data.quantity ?? current.quantity) as string | number;
+		const quantity = D(quantityRaw);
+		const unitPriceRaw = (data.unitPrice ?? current.unitPrice) as string | number | null;
+		const unitPrice = unitPriceRaw === null ? null : D(unitPriceRaw);
+		const totalAmount = unitPrice ? quantity.mul(unitPrice) : quantity;
+
+		const deltas: BalanceDelta[] = [];
+		if (quantity.lt(0)) {
+			deltas.push({
+				accountId: current.accountId,
+				assetId: current.assetId,
+				delta: quantity.toNumber(),
+			});
+		}
+		await this.balanceGuard.ensure(userId, deltas);
 
 		return await this.transactionRepository.create({
 			userId,
@@ -76,11 +94,11 @@ export class AdjustTransactionUseCase {
 			transactionType: current.transactionType as TransactionType,
 			correctionType: (data.correctionType as TransactionCorrectionType | null) ?? TransactionCorrectionType.ADJUST,
 			referenceTxId: id,
-			quantity: quantity.toString(),
-			unitPrice: unitPrice.toString(),
-			totalAmount: totalAmount.toString(),
+			quantity: toFixed(quantity),
+			unitPrice: unitPrice ? toFixed(unitPrice) : null,
+			totalAmount: toFixed(totalAmount),
 			currencyCode: current.currencyCode,
-			exchangeRate: data?.exchangeRate?.toString() ?? null,
+			exchangeRate: data?.exchangeRate === undefined ? null : (data.exchangeRate as string | null),
 			transactionDate: (data?.transactionDate as number) ?? current.transactionDate,
 			notes: (data?.notes as string) || (data?.reason as string) || null,
 		});
