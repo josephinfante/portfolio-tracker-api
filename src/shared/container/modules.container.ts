@@ -6,6 +6,7 @@ import { registerAssetModule } from "@modules/assets";
 import { createAssetApiRoutes } from "@modules/assets/infrastructure/http/api.routes";
 import { registerTransactionModule } from "@modules/transactions";
 import { createTransactionApiRoutes } from "@modules/transactions/infrastructure/http/api.routes";
+import { BalanceGuardService } from "@modules/transactions/application/services/balance-guard.service";
 import { registerPlatformModule } from "@modules/platforms";
 import { createPlatformApiRoutes } from "@modules/platforms/infrastructure/http/api.routes";
 import { registerUserModule } from "@modules/users";
@@ -17,6 +18,8 @@ import { createAssetPriceApiRoutes } from "@modules/asset-prices/infrastructure/
 import { createPortfolioSnapshotApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/api.routes";
 import { registerPortfolioSnapshotModule } from "@modules/portfolio-snapshots";
 import { Router } from "express";
+import { container } from "tsyringe";
+import { TOKENS } from "./tokens";
 
 export function registerAllModules() {
 	registerUserModule();
@@ -25,6 +28,7 @@ export function registerAllModules() {
 	registerAccountModule();
 	registerAssetModule();
 	registerTransactionModule();
+	container.registerSingleton(TOKENS.BalanceGuardService, BalanceGuardService);
 	registerExchangeRateModule();
 	registerAssetPriceModule();
 	registerPortfolioSnapshotModule();
