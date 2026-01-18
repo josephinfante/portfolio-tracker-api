@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "exchange_rates_unique_rate" ON "exchange_rates" USING btree ("base_currency","quote_currency","source","rate_at");

@@ -28,22 +28,22 @@ export function errorMiddleware(err: Error, req: Request, res: Response, next: N
 	);
 
 	/**
-	 * Respuesta segura para el cliente (no exponemos stack ni metadata)
-	 */
-	const safeResponse = baseError.toClientSafe();
-
-	/**
 	 * En desarrollo mostramos el error completo (ayuda a debug)
 	 */
 	if (environment.NODE_ENV === "development") {
+		const safeResponse = baseError.toDevelopSafe();
 		return res.status(baseError.statusCode).json({
 			success: false,
 			error: {
 				...safeResponse,
-				details: baseError.message,
 			},
 		});
 	}
+
+	/**
+	 * Respuesta segura para el cliente (no exponemos stack ni metadata)
+	 */
+	const safeResponse = baseError.toClientSafe();
 
 	/**
 	 * En producción NO mostramos metadata
