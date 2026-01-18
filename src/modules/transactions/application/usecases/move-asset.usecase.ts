@@ -12,6 +12,9 @@ import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { inject, injectable } from "tsyringe";
+import { BalanceGuardService } from "../services/balance-guard.service";
+import { BalanceDelta } from "@modules/transactions/domain/balance.types";
+import { D } from "@shared/helpers/decimal";
 
 @injectable()
 export class MoveAssetUseCase {
@@ -20,6 +23,7 @@ export class MoveAssetUseCase {
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 		private exchangeAssetUseCase: ExchangeAssetUseCase,
 		private transferAssetUseCase: TransferAssetUseCase,
+		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -36,11 +40,11 @@ export class MoveAssetUseCase {
 
 		const data = result.data;
 
-		if (data.fromQuantity <= 0) {
+		if (!D(data.fromQuantity).gt(0)) {
 			throw new BusinessLogicError("From quantity must be greater than 0");
 		}
 
-		if (data.toQuantity !== undefined && data.toQuantity <= 0) {
+		if (data.toQuantity !== undefined && !D(data.toQuantity).gt(0)) {
 			throw new BusinessLogicError("To quantity must be greater than 0");
 		}
 
@@ -93,6 +97,22 @@ export class MoveAssetUseCase {
 		if (data.fee && data.fee.amount <= 0) {
 			throw new BusinessLogicError("Fee amount must be greater than 0");
 		}
+
+		const deltas: BalanceDelta[] = [
+			{
+				accountId: data.fromAccountId,
+				assetId: data.fromAssetId,
+				delta: D(data.fromQuantity).neg().toNumber(),
+			},
+		];
+		if (data.fee) {
+			deltas.push({
+				accountId: data.fromAccountId,
+				assetId: data.fee.assetId,
+				delta: D(data.fee.amount).neg().toNumber(),
+			});
+		}
+		await this.balanceGuard.ensure(userId, deltas);
 
 		if (data.fromAssetId === data.toAssetId) {
 			return this.transferAssetUseCase.execute(userId, {

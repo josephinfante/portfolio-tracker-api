@@ -12,12 +12,12 @@ export class CreateTodaySnapshotUseCase {
 		@inject(TOKENS.PortfolioSnapshotRepository) private portfolioSnapshotRepository: PortfolioSnapshotRepository,
 	) {}
 
-	async execute(userId: string): Promise<BuiltSnapshot> {
+	async execute(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
 		if (!userId || typeof userId !== "string") {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
 
-		const snapshot = await this.buildSnapshotUseCase.execute(userId);
+		const snapshot = await this.buildSnapshotUseCase.execute(userId, timeZone);
 
 		await this.portfolioSnapshotRepository.runInTransaction(async (tx) => {
 			const existing = await this.portfolioSnapshotRepository.findByUserAndDate(

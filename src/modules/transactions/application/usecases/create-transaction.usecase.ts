@@ -10,6 +10,9 @@ import { TransactionCorrectionType, TransactionType } from "@modules/transaction
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { AuthorizationError } from "@shared/errors/domain/authorization.error";
 import { Drizzle } from "@shared/database/drizzle/client";
+import { BalanceGuardService } from "../services/balance-guard.service";
+import { BalanceDelta } from "@modules/transactions/domain/balance.types";
+import { D, toFixed } from "@shared/helpers/decimal";
 
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
@@ -23,6 +26,7 @@ export class CreateTransactionUseCase {
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.Drizzle) private db: Drizzle,
+		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -65,7 +69,28 @@ export class CreateTransactionUseCase {
 			throw new NotFoundError(`Asset ${data.fee.assetId} not found`);
 		}
 
-		const totalAmount = data?.unitPrice ? data.quantity * data.unitPrice : data.quantity;
+		const totalAmount = data?.unitPrice ? D(data.quantity).mul(D(data.unitPrice)) : D(data.quantity);
+
+		const deltas: BalanceDelta[] = [];
+		const quantityDelta = D(data.quantity);
+		if (quantityDelta.lt(0)) {
+			deltas.push({
+				accountId: data.accountId,
+				assetId: data.assetId,
+				delta: quantityDelta.toNumber(),
+			});
+		}
+		if (data.fee) {
+			const feeDelta = D(data.fee.quantity).neg();
+			if (feeDelta.lt(0)) {
+				deltas.push({
+					accountId: data.accountId,
+					assetId: data.fee.assetId,
+					delta: feeDelta.toNumber(),
+				});
+			}
+		}
+		await this.balanceGuard.ensure(userId, deltas);
 
 		return await this.db.transaction(async (tx) => {
 			const transaction = await this.transactionRepository.create(
@@ -76,11 +101,12 @@ export class CreateTransactionUseCase {
 					transactionType: data.transactionType as TransactionType,
 					correctionType: (data.correctionType as TransactionCorrectionType | null) ?? null,
 					referenceTxId: data.referenceTxId ?? null,
-					quantity: data.quantity.toString(),
-					unitPrice: data.unitPrice?.toString() ?? null,
-					totalAmount: totalAmount.toString(),
+					quantity: toFixed(D(data.quantity)),
+					unitPrice: data.unitPrice === null || data.unitPrice === undefined ? null : toFixed(D(data.unitPrice)),
+					totalAmount: toFixed(totalAmount),
 					currencyCode,
-					exchangeRate: data.exchangeRate?.toString() ?? null,
+					exchangeRate:
+						data.exchangeRate === null || data.exchangeRate === undefined ? null : toFixed(D(data.exchangeRate)),
 					transactionDate: data.transactionDate,
 					notes: data.notes ?? null,
 				},
@@ -96,9 +122,9 @@ export class CreateTransactionUseCase {
 						transactionType: TransactionType.FEE,
 						correctionType: null,
 						referenceTxId: transaction.id,
-						quantity: (-data.fee.quantity).toString(),
+						quantity: toFixed(D(data.fee.quantity).neg()),
 						unitPrice: "1",
-						totalAmount: data.fee.quantity.toString(),
+						totalAmount: toFixed(D(data.fee.quantity)),
 						currencyCode: feeAsset.symbol.trim().toUpperCase(),
 						exchangeRate: null,
 						transactionDate: data.transactionDate,

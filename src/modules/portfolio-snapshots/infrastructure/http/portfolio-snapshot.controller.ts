@@ -7,9 +7,15 @@ import { injectable } from "tsyringe";
 export class PortfolioSnapshotController {
 	constructor(private readonly portfolioSnapshotService: PortfolioSnapshotService) {}
 
-	createToday = asyncHandler(async (_req: Request, res: Response) => {
+	createToday = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
-		const response = await this.portfolioSnapshotService.createTodaySnapshot(userId);
+		const timeZone =
+			typeof req.body?.timeZone === "string"
+				? req.body.timeZone
+				: typeof req.query?.timeZone === "string"
+					? req.query.timeZone
+					: undefined;
+		const response = await this.portfolioSnapshotService.createTodaySnapshot(userId, timeZone);
 		return res.status(201).success(response);
 	});
 

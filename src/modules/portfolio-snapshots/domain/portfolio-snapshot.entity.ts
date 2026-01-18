@@ -2,11 +2,11 @@ export interface PorfolioSnapshot {
 	id: string;
 	userId: string;
 
-	snapshotDate: Date;
-	fxUsdToBase: number;
+	snapshotDate: string;
+	fxUsdToBase: string;
 
-	totalValueUsd: number;
-	totalValueBase: number;
+	totalValueUsd: string;
+	totalValueBase: string;
 
 	createdAt: number;
 	updatedAt: number;
@@ -18,12 +18,12 @@ export interface PortfolioSnapshotItems {
 	accountId: string;
 	assetId: string;
 
-	quantity: number;
-	priceUsd: number;
-	priceBase: number;
+	quantity: string;
+	priceUsd: string;
+	priceBase: string;
 
-	valueUsd: number;
-	valueBase: number;
+	valueUsd: string;
+	valueBase: string;
 
 	createdAt: number;
 }

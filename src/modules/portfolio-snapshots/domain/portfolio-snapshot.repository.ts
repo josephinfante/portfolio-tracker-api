@@ -6,25 +6,25 @@ import { SnapshotListFilters } from "./portfolio-snapshot.types";
 export type CreatePortfolioSnapshotInput = {
 	userId: string;
 	snapshotDate: string; // YYYY-MM-DD
-	fxUsdToBase: string;
-	totalValueUsd: string;
-	totalValueBase: string;
+	fxUsdToBase: number;
+	totalValueUsd: number;
+	totalValueBase: number;
 };
 
 export type UpdatePortfolioSnapshotInput = {
-	fxUsdToBase: string;
-	totalValueUsd: string;
-	totalValueBase: string;
+	fxUsdToBase: number;
+	totalValueUsd: number;
+	totalValueBase: number;
 };
 
 export type CreatePortfolioSnapshotItemInput = {
 	accountId: string;
 	assetId: string;
-	quantity: string;
-	priceUsd: string;
-	priceBase: string;
-	valueUsd: string;
-	valueBase: string;
+	quantity: number;
+	priceUsd: number;
+	priceBase: number;
+	valueUsd: number;
+	valueBase: number;
 };
 
 export type SnapshotItemDetail = {

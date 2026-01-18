@@ -12,6 +12,9 @@ import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { inject, injectable } from "tsyringe";
+import { D, toFixed } from "@shared/helpers/decimal";
+import { BalanceGuardService } from "../services/balance-guard.service";
+import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 
 const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
 
@@ -21,6 +24,7 @@ export class ExchangeAssetUseCase {
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -95,30 +99,28 @@ export class ExchangeAssetUseCase {
 			this.assertAccountSupportsAsset(fromAccount, feeAsset, "source");
 		}
 
-		const fromBalance = await this.transactionRepository.getAssetBalance(userId, data.fromAccountId, data.fromAssetId);
-
-		const feeAmount = data.fee?.amount ?? 0;
-		const requiredFromBalance =
-			data.fee?.assetId === data.fromAssetId ? data.fromQuantity + feeAmount : data.fromQuantity;
-
-		if (fromBalance < requiredFromBalance) {
-			throw new BusinessLogicError("Insufficient balance for exchange");
+		const deltas: BalanceDelta[] = [
+			{
+				accountId: data.fromAccountId,
+				assetId: data.fromAssetId,
+				delta: D(data.fromQuantity).neg().toNumber(),
+			},
+		];
+		if (data.fee) {
+			deltas.push({
+				accountId: data.fromAccountId,
+				assetId: data.fee.assetId,
+				delta: D(data.fee.amount).neg().toNumber(),
+			});
 		}
-
-		if (data.fee && data.fee.assetId !== data.fromAssetId) {
-			const feeBalance = await this.transactionRepository.getAssetBalance(userId, data.fromAccountId, data.fee.assetId);
-
-			if (feeBalance < data.fee.amount) {
-				throw new BusinessLogicError("Insufficient balance for fee");
-			}
-		}
+		await this.balanceGuard.ensure(userId, deltas);
 
 		const transactionDate = data.transactionDate ?? Date.now();
 		const fromCurrencyCode = normalizeCurrencyCode(fromAsset.symbol);
 		const toCurrencyCode = normalizeCurrencyCode(toAsset.symbol);
 
 		return await this.transactionRepository.runInTransaction(async (tx) => {
-			const sellTotalAmount = data.price ? data.fromQuantity * data.price : data.fromQuantity;
+			const sellTotalAmount = data.price ? D(data.fromQuantity).mul(D(data.price)) : D(data.fromQuantity);
 			const sellTx = await this.transactionRepository.create(
 				{
 					userId,
@@ -127,11 +129,12 @@ export class ExchangeAssetUseCase {
 					transactionType: TransactionType.SELL,
 					correctionType: null,
 					referenceTxId: null,
-					quantity: (-data.fromQuantity).toString(),
-					unitPrice: data.price?.toString() ?? null,
-					totalAmount: sellTotalAmount.toString(),
+					quantity: toFixed(D(data.fromQuantity).neg()),
+					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
+					totalAmount: toFixed(sellTotalAmount),
 					currencyCode: fromCurrencyCode,
-					exchangeRate: data.exchangeRate?.toString() ?? null,
+					exchangeRate:
+						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
 					notes: data.notes ?? null,
 				},
@@ -148,9 +151,9 @@ export class ExchangeAssetUseCase {
 						transactionType: TransactionType.FEE,
 						correctionType: null,
 						referenceTxId: sellTx.id,
-						quantity: (-data.fee.amount).toString(),
+						quantity: toFixed(D(data.fee.amount).neg()),
 						unitPrice: "1",
-						totalAmount: data.fee.amount.toString(),
+						totalAmount: toFixed(D(data.fee.amount)),
 						currencyCode: feeCurrencyCode,
 						exchangeRate: null,
 						transactionDate,
@@ -160,7 +163,7 @@ export class ExchangeAssetUseCase {
 				);
 			}
 
-			const buyTotalAmount = data.price ? data.toQuantity * data.price : data.toQuantity;
+			const buyTotalAmount = data.price ? D(data.toQuantity).mul(D(data.price)) : D(data.toQuantity);
 			await this.transactionRepository.create(
 				{
 					userId,
@@ -169,11 +172,12 @@ export class ExchangeAssetUseCase {
 					transactionType: TransactionType.BUY,
 					correctionType: null,
 					referenceTxId: sellTx.id,
-					quantity: data.toQuantity.toString(),
-					unitPrice: data.price?.toString() ?? null,
-					totalAmount: buyTotalAmount.toString(),
+					quantity: toFixed(D(data.toQuantity)),
+					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
+					totalAmount: toFixed(buyTotalAmount),
 					currencyCode: toCurrencyCode,
-					exchangeRate: data.exchangeRate?.toString() ?? null,
+					exchangeRate:
+						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
 					notes: data.notes ?? null,
 				},
