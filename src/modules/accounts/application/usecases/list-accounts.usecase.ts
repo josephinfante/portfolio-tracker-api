@@ -31,9 +31,6 @@ export class ListAccountsUseCase {
 		const rawPlatform = options?.platform;
 		const platform = typeof rawPlatform === "string" && rawPlatform.length ? rawPlatform : undefined;
 
-		const rawCurrencyCode = options?.currencyCode;
-		const currencyCode = typeof rawCurrencyCode === "string" && rawCurrencyCode.length === 3 ? rawCurrencyCode : undefined;
-
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
 		const { items, totalCount } = await this.accountRepository.findByUserId(userId, {
@@ -41,7 +38,6 @@ export class ListAccountsUseCase {
 			offset: sqlOffset,
 			search,
 			platform,
-			currencyCode,
 		});
 
 		return buildPaginatedResponse({
@@ -54,7 +50,6 @@ export class ListAccountsUseCase {
 				page,
 				search,
 				platform,
-				currencyCode,
 			},
 		});
 	}
