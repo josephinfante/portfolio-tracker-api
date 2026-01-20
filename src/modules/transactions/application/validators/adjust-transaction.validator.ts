@@ -6,10 +6,10 @@ export const AdjustTransactionSchema = z.object({
 		.number()
 		.refine((value) => Number.isFinite(value), "Quantity must be a finite number")
 		.optional(),
-	unitPrice: z
+	paymentAssetId: z.string().min(1, "Payment asset is required").optional(),
+	paymentQuantity: z
 		.number()
-		.refine((value) => Number.isFinite(value), "Unit price must be a finite number")
-		.nullable()
+		.refine((value) => Number.isFinite(value), "Payment quantity must be a finite number")
 		.optional(),
 	exchangeRate: z
 		.number()

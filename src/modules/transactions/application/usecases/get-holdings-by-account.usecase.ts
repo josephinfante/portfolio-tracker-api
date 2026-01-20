@@ -1,5 +1,5 @@
 import { TransactionRepository } from "@modules/transactions/domain/transaction.repository";
-import { Holding, TransactionType } from "@modules/transactions/domain/transaction.types";
+import { Holding, TransactionCorrectionType, TransactionType } from "@modules/transactions/domain/transaction.types";
 import { TOKENS } from "@shared/container/tokens";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
@@ -17,9 +17,17 @@ const transactionTypeSigns = new Map<TransactionType, number>([
 	[TransactionType.FEE, -1],
 ]);
 
-const normalizeQuantity = (transactionType: TransactionType, quantity: number) => {
+const normalizeQuantity = (
+	transactionType: TransactionType,
+	correctionType: TransactionCorrectionType | null,
+	quantity: number,
+) => {
 	if (!Number.isFinite(quantity) || quantity === 0) {
 		return 0;
+	}
+
+	if (correctionType) {
+		return quantity;
 	}
 
 	const sign = transactionTypeSigns.get(transactionType);
@@ -47,7 +55,11 @@ export class GetHoldingsByAccountUseCase {
 		const holdings = new Map<string, { accountId: string; assetId: string; quantity: number }>();
 
 		for (const transaction of items) {
-			const normalizedQuantity = normalizeQuantity(transaction.transactionType, transaction.quantity);
+			const normalizedQuantity = normalizeQuantity(
+				transaction.transactionType,
+				transaction.correctionType,
+				transaction.quantity,
+			);
 			if (normalizedQuantity === 0) {
 				continue;
 			}

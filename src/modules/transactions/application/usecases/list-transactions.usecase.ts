@@ -14,8 +14,6 @@ import { buildPaginatedResponse } from "@shared/helpers/pagination";
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
 
-const normalizeCurrencyCode = (code: string) => code.trim().toUpperCase();
-
 const parseNumber = (value: unknown) => {
 	if (typeof value === "number" && Number.isFinite(value)) {
 		return value;
@@ -67,18 +65,17 @@ export class ListTransactionsUseCase {
 
 		const quantityMin = parseNumber(options?.quantityMin);
 		const quantityMax = parseNumber(options?.quantityMax);
-		const unitPriceMin = parseNumber(options?.unitPriceMin);
-		const unitPriceMax = parseNumber(options?.unitPriceMax);
 		const totalAmountMin = parseNumber(options?.totalAmountMin);
 		const totalAmountMax = parseNumber(options?.totalAmountMax);
 		const startDate = parseNumber(options?.startDate);
 		const endDate = parseNumber(options?.endDate);
 
-		const rawCurrencyCode = options?.currencyCode;
-		const currencyCode =
-			typeof rawCurrencyCode === "string" && rawCurrencyCode.length === 3
-				? normalizeCurrencyCode(rawCurrencyCode)
+		const paymentAssetId =
+			typeof options?.paymentAssetId === "string" && options.paymentAssetId.length
+				? options.paymentAssetId
 				: undefined;
+		const paymentQuantityMin = parseNumber(options?.paymentQuantityMin);
+		const paymentQuantityMax = parseNumber(options?.paymentQuantityMax);
 
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
@@ -92,11 +89,11 @@ export class ListTransactionsUseCase {
 			referenceTxId,
 			quantityMin,
 			quantityMax,
-			unitPriceMin,
-			unitPriceMax,
 			totalAmountMin,
 			totalAmountMax,
-			currencyCode,
+			paymentAssetId,
+			paymentQuantityMin,
+			paymentQuantityMax,
 			startDate,
 			endDate,
 		});
@@ -116,11 +113,11 @@ export class ListTransactionsUseCase {
 				referenceTxId,
 				quantityMin,
 				quantityMax,
-				unitPriceMin,
-				unitPriceMax,
 				totalAmountMin,
 				totalAmountMax,
-				currencyCode,
+				paymentAssetId,
+				paymentQuantityMin,
+				paymentQuantityMax,
 				startDate,
 				endDate,
 			},

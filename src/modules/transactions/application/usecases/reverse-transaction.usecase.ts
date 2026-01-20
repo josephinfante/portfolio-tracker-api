@@ -42,17 +42,31 @@ export class ReverseTransactionUseCase {
 			throw new AuthorizationError("Access denied");
 		}
 
+		const related = await this.transactionRepository.findByUserId(userId, { referenceTxId: id });
+		const relatedTransactions = related.items.filter((item) => item.correctionType === null);
+
+		const transactionsToReverse = [...relatedTransactions, transaction];
+
 		const deltas: BalanceDelta[] = [];
-		const delta = D(transaction.quantity).neg();
-		if (delta.lt(0)) {
-			deltas.push({
-				accountId: transaction.accountId,
-				assetId: transaction.assetId,
-				delta: delta.toNumber(),
-			});
+		for (const item of transactionsToReverse) {
+			const delta = D(item.quantity).neg();
+			if (delta.lt(0)) {
+				deltas.push({
+					accountId: item.accountId,
+					assetId: item.assetId,
+					delta: delta.toNumber(),
+				});
+			}
 		}
 		await this.balanceGuard.ensure(userId, deltas);
 
-		return this.transactionRepository.reverse(id, result.data.reason ?? null);
+		const reason = result.data.reason ?? null;
+		return this.transactionRepository.runInTransaction(async (tx) => {
+			for (const item of relatedTransactions) {
+				await this.transactionRepository.reverse(item.id, reason, tx);
+			}
+
+			return this.transactionRepository.reverse(id, reason, tx);
+		});
 	}
 }

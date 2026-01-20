@@ -55,8 +55,8 @@ export class AdjustTransactionUseCase {
 			data.quantity = toFixed(D(data.quantity as number));
 		}
 
-		if (data.unitPrice !== undefined) {
-			data.unitPrice = data.unitPrice === null ? null : toFixed(D(data.unitPrice as number));
+		if (data.paymentQuantity !== undefined) {
+			data.paymentQuantity = toFixed(D(data.paymentQuantity as number));
 		}
 
 		if (data.totalAmount !== undefined) {
@@ -73,9 +73,9 @@ export class AdjustTransactionUseCase {
 
 		const quantityRaw = (data.quantity ?? current.quantity) as string | number;
 		const quantity = D(quantityRaw);
-		const unitPriceRaw = (data.unitPrice ?? current.unitPrice) as string | number | null;
-		const unitPrice = unitPriceRaw === null ? null : D(unitPriceRaw);
-		const totalAmount = unitPrice ? quantity.mul(unitPrice) : quantity;
+		const paymentQuantityRaw = (data.paymentQuantity ?? current.paymentQuantity) as string | number;
+		const paymentQuantity = D(paymentQuantityRaw);
+		const totalAmount = paymentQuantity;
 
 		const deltas: BalanceDelta[] = [];
 		if (quantity.lt(0)) {
@@ -95,9 +95,9 @@ export class AdjustTransactionUseCase {
 			correctionType: (data.correctionType as TransactionCorrectionType | null) ?? TransactionCorrectionType.ADJUST,
 			referenceTxId: id,
 			quantity: toFixed(quantity),
-			unitPrice: unitPrice ? toFixed(unitPrice) : null,
 			totalAmount: toFixed(totalAmount),
-			currencyCode: current.currencyCode,
+			paymentAssetId: (data.paymentAssetId as string | undefined) ?? current.paymentAssetId,
+			paymentQuantity: toFixed(paymentQuantity),
 			exchangeRate: data?.exchangeRate === undefined ? null : (data.exchangeRate as string | null),
 			transactionDate: (data?.transactionDate as number) ?? current.transactionDate,
 			notes: (data?.notes as string) || (data?.reason as string) || null,

@@ -16,8 +16,6 @@ import { D, toFixed } from "@shared/helpers/decimal";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 
-const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
-
 @injectable()
 export class ExchangeAssetUseCase {
 	constructor(
@@ -116,8 +114,6 @@ export class ExchangeAssetUseCase {
 		await this.balanceGuard.ensure(userId, deltas);
 
 		const transactionDate = data.transactionDate ?? Date.now();
-		const fromCurrencyCode = normalizeCurrencyCode(fromAsset.symbol);
-		const toCurrencyCode = normalizeCurrencyCode(toAsset.symbol);
 
 		return await this.transactionRepository.runInTransaction(async (tx) => {
 			const sellTotalAmount = data.price ? D(data.fromQuantity).mul(D(data.price)) : D(data.fromQuantity);
@@ -130,9 +126,9 @@ export class ExchangeAssetUseCase {
 					correctionType: null,
 					referenceTxId: null,
 					quantity: toFixed(D(data.fromQuantity).neg()),
-					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
 					totalAmount: toFixed(sellTotalAmount),
-					currencyCode: fromCurrencyCode,
+					paymentAssetId: data.fromAssetId,
+					paymentQuantity: toFixed(sellTotalAmount),
 					exchangeRate:
 						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
@@ -141,23 +137,22 @@ export class ExchangeAssetUseCase {
 				tx,
 			);
 
-			if (data.fee && feeAsset) {
-				const feeCurrencyCode = normalizeCurrencyCode(feeAsset.symbol);
-				await this.transactionRepository.create(
-					{
-						userId,
-						accountId: data.fromAccountId,
-						assetId: data.fee.assetId,
+				if (data.fee && feeAsset) {
+					await this.transactionRepository.create(
+						{
+							userId,
+							accountId: data.fromAccountId,
+							assetId: data.fee.assetId,
 						transactionType: TransactionType.FEE,
-						correctionType: null,
-						referenceTxId: sellTx.id,
-						quantity: toFixed(D(data.fee.amount).neg()),
-						unitPrice: "1",
-						totalAmount: toFixed(D(data.fee.amount)),
-						currencyCode: feeCurrencyCode,
-						exchangeRate: null,
-						transactionDate,
-						notes: `Fee for exchange ${sellTx.id}`,
+							correctionType: null,
+							referenceTxId: sellTx.id,
+							quantity: toFixed(D(data.fee.amount).neg()),
+							totalAmount: toFixed(D(data.fee.amount)),
+							paymentAssetId: data.fee.assetId,
+							paymentQuantity: toFixed(D(data.fee.amount)),
+							exchangeRate: null,
+							transactionDate,
+							notes: `Fee for exchange ${sellTx.id}`,
 					},
 					tx,
 				);
@@ -173,9 +168,9 @@ export class ExchangeAssetUseCase {
 					correctionType: null,
 					referenceTxId: sellTx.id,
 					quantity: toFixed(D(data.toQuantity)),
-					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
 					totalAmount: toFixed(buyTotalAmount),
-					currencyCode: toCurrencyCode,
+					paymentAssetId: data.toAssetId,
+					paymentQuantity: toFixed(buyTotalAmount),
 					exchangeRate:
 						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
@@ -189,14 +184,24 @@ export class ExchangeAssetUseCase {
 	}
 
 	private assertAccountSupportsAsset(
-		account: { id: string; platform?: { type: string } },
-		asset: { asset_type: AssetType },
+		account: { id: string; platform?: { type: string }; currencyCode?: string | null },
+		asset: { asset_type: AssetType; symbol: string },
 		label: string,
 	) {
 		const platformType = account.platform?.type;
 
 		if (platformType === PlatformTypes.bank && asset.asset_type !== AssetType.fiat) {
 			throw new BusinessLogicError(`The ${label} account does not support this asset type`);
+		}
+
+		if (platformType === PlatformTypes.bank) {
+			const currencyCode = account.currencyCode?.toUpperCase();
+			if (!currencyCode) {
+				throw new BusinessLogicError(`The ${label} account requires a currency code`);
+			}
+			if (asset.symbol.toUpperCase() !== currencyCode) {
+				throw new BusinessLogicError(`The ${label} account only supports ${currencyCode} assets`);
+			}
 		}
 	}
 }
