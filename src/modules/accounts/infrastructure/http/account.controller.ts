@@ -33,6 +33,13 @@ export class AccountController {
 		return res.status(200).success(response);
 	});
 
+	balance = asyncHandler(async (req: Request, res: Response) => {
+		const userId = res.locals.user.id;
+		const id = req.params.id as string;
+		const response = await this.accountService.getAccountBalance(userId, id);
+		return res.status(200).success(response);
+	});
+
 	remove = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
 		const id = req.params.id as string;
