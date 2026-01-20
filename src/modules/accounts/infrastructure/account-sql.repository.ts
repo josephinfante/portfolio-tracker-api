@@ -19,21 +19,11 @@ export class AccountSqlRepository implements AccountRepository {
 		return Date.now();
 	}
 
-	private normalizeCurrencyCode(value?: string) {
-		const v = value?.trim().toUpperCase();
-		return v && v.length >= 3 ? v : undefined;
-	}
-
 	private buildWhere(userId: string, options?: AccountListFilters) {
 		const conditions: SQL[] = [eq(accountsTable.userId, userId)];
 
 		if (options?.search?.trim()) {
 			conditions.push(ilike(accountsTable.name, `%${options.search.trim()}%`));
-		}
-
-		const currency = this.normalizeCurrencyCode(options?.currencyCode);
-		if (currency) {
-			conditions.push(eq(accountsTable.currencyCode, currency));
 		}
 
 		if (options?.platform?.trim()) {
@@ -119,7 +109,7 @@ export class AccountSqlRepository implements AccountRepository {
 				userId: input.userId,
 				platformId: input.platformId,
 				name: input.name,
-				currencyCode: input.currencyCode,
+				currencyCode: input.currencyCode ?? null,
 				createdAt: now,
 				updatedAt: now,
 			})

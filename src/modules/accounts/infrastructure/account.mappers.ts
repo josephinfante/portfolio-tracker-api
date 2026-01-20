@@ -8,7 +8,7 @@ export class AccountMapper {
 			userId: row.userId,
 			platformId: row.platformId,
 			name: row.name,
-			currencyCode: row.currencyCode,
+			currencyCode: row.currencyCode ?? null,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 		};
@@ -47,7 +47,7 @@ export class AccountMapper {
 			userId: entity.userId,
 			platformId: entity.platformId,
 			name: entity.name,
-			currencyCode: entity.currencyCode,
+			currencyCode: entity.currencyCode ?? null,
 			createdAt: entity.createdAt,
 			updatedAt: entity.updatedAt,
 		};

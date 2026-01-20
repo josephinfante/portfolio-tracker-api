@@ -4,7 +4,7 @@ export interface AccountEntity {
 	platformId: string;
 
 	name: string;
-	currencyCode: string;
+	currencyCode?: string | null;
 
 	createdAt: number; // unix timestamp
 	updatedAt: number; // unix timestamp
