@@ -5,6 +5,8 @@ import { FindSnapshotsUseCase } from "./usecases/find-snapshots.usecase";
 import { SnapshotListFilters } from "../domain/portfolio-snapshot.types";
 import { FindSnapshotByIdUseCase } from "./usecases/find-snapshot-by-id.usecase";
 import { SnapshotDetail } from "../domain/portfolio-snapshot.entity";
+import { GetPortfolioMetricsUseCase } from "./usecases/get-portfolio-metrics.usecase";
+import { PortfolioMetricsResponse } from "../domain/portfolio-metrics.types";
 
 @injectable()
 export class PortfolioSnapshotService {
@@ -12,6 +14,7 @@ export class PortfolioSnapshotService {
 		private createTodaySnapshotUseCase: CreateTodaySnapshotUseCase,
 		private findSnapshotsUseCase: FindSnapshotsUseCase,
 		private findSnapshotByIdUseCase: FindSnapshotByIdUseCase,
+		private getPortfolioMetricsUseCase: GetPortfolioMetricsUseCase,
 	) {}
 
 	async createTodaySnapshot(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
@@ -24,5 +27,9 @@ export class PortfolioSnapshotService {
 
 	async findSnapshotById(userId: string, snapshotId: string): Promise<SnapshotDetail> {
 		return await this.findSnapshotByIdUseCase.execute(userId, snapshotId);
+	}
+
+	async getMetrics(userId: string, timeZone?: string): Promise<PortfolioMetricsResponse> {
+		return await this.getPortfolioMetricsUseCase.execute(userId, timeZone);
 	}
 }

@@ -30,7 +30,7 @@ export type CreatePortfolioSnapshotItemInput = {
 export type SnapshotItemDetail = {
 	accountId: string;
 	accountName: string;
-	accountCurrencyCode: string;
+	accountCurrencyCode: string | null;
 	assetId: string;
 	assetSymbol: string;
 	assetName: string;

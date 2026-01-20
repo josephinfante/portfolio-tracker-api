@@ -237,7 +237,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		const items = rows.map((row) => ({
 			accountId: row.account.id,
 			accountName: row.account.name,
-			accountCurrencyCode: row.account.currencyCode,
+			accountCurrencyCode: row.account.currencyCode ?? null,
 			assetId: row.asset.id,
 			assetSymbol: row.asset.symbol,
 			assetName: row.asset.name,
