@@ -13,6 +13,7 @@ export const SignUpSchema = z.object({
 			globalRegex.password,
 			"Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
 		),
+	baseCurrency: z.string().optional().default("USD"),
 });
 
 export type SignUpDTO = z.infer<typeof SignUpSchema>;
