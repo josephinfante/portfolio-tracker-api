@@ -30,9 +30,9 @@ export class TransactionMapper {
 			correctionType: row.correctionType as TransactionCorrectionType | null,
 			referenceTxId: row.referenceTxId ?? null,
 			quantity: toNumber(row.quantity),
-			unitPrice: toNullableNumber(row.unitPrice),
 			totalAmount: toNumber(row.totalAmount),
-			currencyCode: row.currencyCode,
+			paymentAssetId: row.paymentAssetId,
+			paymentQuantity: toNumber(row.paymentQuantity),
 			exchangeRate: toNullableNumber(row.exchangeRate),
 			transactionDate: row.transactionDate,
 			notes: row.notes ?? null,
@@ -46,7 +46,7 @@ export class TransactionMapper {
 
 	static toEntityWithDetails(row: {
 		transaction: typeof transactionsTable.$inferSelect;
-		account: { id: string; name: string; currencyCode: string };
+		account: { id: string; name: string };
 		asset: { id: string; symbol: string; name: string };
 	}): TransactionEntity {
 		return {
@@ -54,7 +54,6 @@ export class TransactionMapper {
 			account: {
 				id: row.account.id,
 				name: row.account.name,
-				currencyCode: row.account.currencyCode,
 			},
 			asset: {
 				id: row.asset.id,
@@ -67,7 +66,7 @@ export class TransactionMapper {
 	static toEntityListWithDetails(
 		rows: {
 			transaction: typeof transactionsTable.$inferSelect;
-			account: { id: string; name: string; currencyCode: string };
+			account: { id: string; name: string };
 			asset: { id: string; symbol: string; name: string };
 		}[],
 	): TransactionEntity[] {

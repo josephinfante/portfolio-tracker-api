@@ -10,9 +10,9 @@ export interface TransactionEntity {
 	correctionType: TransactionCorrectionType | null;
 	referenceTxId: string | null;
 	quantity: number;
-	unitPrice: number | null;
 	totalAmount: number;
-	currencyCode: string;
+	paymentAssetId: string;
+	paymentQuantity: number;
 	exchangeRate: number | null;
 	transactionDate: number; // unix timestamp
 	notes: string | null;
@@ -22,7 +22,6 @@ export interface TransactionEntity {
 	account?: {
 		id: string;
 		name: string;
-		currencyCode: string;
 	};
 
 	asset?: {

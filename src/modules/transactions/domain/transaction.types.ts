@@ -38,9 +38,9 @@ export interface CreateTransactionInput {
 	correctionType: TransactionCorrectionType | null;
 	referenceTxId: string | null;
 	quantity: string;
-	unitPrice: string | null;
 	totalAmount: string;
-	currencyCode: string;
+	paymentAssetId: string;
+	paymentQuantity: string;
 	exchangeRate: string | null;
 	transactionDate: number; // unix timestamp
 	notes: string | null;
@@ -57,11 +57,11 @@ export interface TransactionListFilters {
 	referenceTxId?: string;
 	quantityMin?: number;
 	quantityMax?: number;
-	unitPriceMin?: number;
-	unitPriceMax?: number;
 	totalAmountMin?: number;
 	totalAmountMax?: number;
-	currencyCode?: string;
+	paymentAssetId?: string;
+	paymentQuantityMin?: number;
+	paymentQuantityMax?: number;
 	startDate?: number; // unix timestamp
 	endDate?: number; // unix timestamp
 	[key: string]: any;
