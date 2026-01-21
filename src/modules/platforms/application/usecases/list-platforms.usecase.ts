@@ -6,6 +6,7 @@ import { FindByUserIdFilters, PlatformTypes } from "@modules/platforms/domain/pl
 import { PaginatedResponse } from "@shared/types/paginated-response";
 import { PlatformEntity } from "@modules/platforms/domain/platform.entity";
 import { buildPaginatedResponse } from "@shared/helpers/pagination";
+import type { SortDirection } from "@shared/types/sort";
 
 @injectable()
 export class ListPlatformsUseCase {
@@ -16,12 +17,11 @@ export class ListPlatformsUseCase {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
 
-		const rawLimit = options?.limit;
+		const rawLimit = options?.pageSize;
 		const parsedLimit = typeof rawLimit === "string" ? Number(rawLimit) : rawLimit;
-		const limit =
-			parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
+		const limit = parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
 
-		const rawPage = options?.page ?? options?.offset;
+		const rawPage = options?.page;
 		const parsedPage = typeof rawPage === "string" ? Number(rawPage) : rawPage;
 		const page = parsedPage !== undefined && Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
 
@@ -34,13 +34,22 @@ export class ListPlatformsUseCase {
 				? (rawType as PlatformTypes)
 				: undefined;
 
+		const sortBy =
+			typeof options?.sortBy === "string" && options.sortBy.trim().length ? options.sortBy.trim() : undefined;
+		const sortDirection =
+			typeof options?.sortDirection === "string" && ["asc", "desc"].includes(options.sortDirection.toLowerCase())
+				? (options.sortDirection.toLowerCase() as SortDirection)
+				: undefined;
+
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
 		const { items, totalCount } = await this.platformRepository.findByUserId(userId, {
-			limit,
-			offset: sqlOffset,
+			pageSize: limit,
+			page: sqlOffset,
 			search,
 			type,
+			sortBy,
+			sortDirection,
 		});
 
 		return buildPaginatedResponse({
@@ -49,10 +58,12 @@ export class ListPlatformsUseCase {
 			limit,
 			offset: page,
 			meta: {
-				limit,
+				pageSize: limit,
 				page,
 				search,
 				type,
+				sortBy,
+				sortDirection,
 			},
 		});
 	}

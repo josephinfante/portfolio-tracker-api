@@ -1,3 +1,5 @@
+import type { SortDirection } from "@shared/types/sort";
+
 export enum PlatformTypes {
 	exchange = "exchange",
 	bank = "bank",
@@ -24,10 +26,11 @@ export interface UpdatePlatformInput {
 }
 
 export interface FindByUserIdFilters {
-	limit?: number;
-	offset?: number;
 	page?: number;
+	pageSize?: number;
 	search?: string;
 	type?: PlatformTypes;
+	sortBy?: string;
+	sortDirection?: SortDirection;
 	[key: string]: any;
 }
