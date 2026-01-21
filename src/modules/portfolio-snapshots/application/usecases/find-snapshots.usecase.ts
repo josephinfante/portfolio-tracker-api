@@ -3,10 +3,10 @@ import { SnapshotListFilters, SnapshotListOrder } from "@modules/portfolio-snaps
 import { TOKENS } from "@shared/container/tokens";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { buildPaginatedResponse } from "@shared/helpers/pagination";
+import type { SortDirection } from "@shared/types/sort";
 import { inject, injectable } from "tsyringe";
 
-const normalizeOrder = (value?: string): SnapshotListOrder =>
-	value && value.toUpperCase() === "ASC" ? "ASC" : "DESC";
+const normalizeOrder = (value?: string): SnapshotListOrder => (value && value.toUpperCase() === "ASC" ? "ASC" : "DESC");
 
 const parseNumber = (value: unknown) => {
 	if (typeof value === "number" && Number.isFinite(value)) {
@@ -17,6 +17,24 @@ const parseNumber = (value: unknown) => {
 		return Number.isFinite(parsed) ? parsed : undefined;
 	}
 	return undefined;
+};
+
+const normalizeSortDirection = (value: unknown): SortDirection | undefined => {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+
+	const normalized = value.toLowerCase();
+	return normalized === "asc" || normalized === "desc" ? (normalized as SortDirection) : undefined;
+};
+
+const normalizeSortBy = (value: unknown): string | undefined => {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : undefined;
 };
 
 @injectable()
@@ -30,12 +48,11 @@ export class FindSnapshotsUseCase {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
 
-		const rawLimit = options?.limit;
+		const rawLimit = options?.pageSize;
 		const parsedLimit = typeof rawLimit === "string" ? Number(rawLimit) : rawLimit;
-		const limit =
-			parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
+		const limit = parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
 
-		const rawPage = options?.page ?? options?.offset;
+		const rawPage = options?.page;
 		const parsedPage = typeof rawPage === "string" ? Number(rawPage) : rawPage;
 		const page = parsedPage !== undefined && Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
 
@@ -44,14 +61,19 @@ export class FindSnapshotsUseCase {
 		const startDate = parseNumber(options?.startDate);
 		const endDate = parseNumber(options?.endDate);
 
+		const sortBy = normalizeSortBy(options?.sortBy);
+		const sortDirection = normalizeSortDirection(options?.sortDirection);
+
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
 		const { items, totalCount } = await this.portfolioSnapshotRepository.findAllByUser(userId, {
-			limit,
-			offset: sqlOffset,
+			pageSize: limit,
+			page: sqlOffset,
 			order,
 			startDate,
 			endDate,
+			sortBy,
+			sortDirection,
 		});
 
 		return buildPaginatedResponse({
@@ -60,11 +82,13 @@ export class FindSnapshotsUseCase {
 			limit,
 			offset: page,
 			meta: {
-				limit,
+				pageSize: limit,
 				page,
 				order,
 				startDate,
 				endDate,
+				sortBy,
+				sortDirection,
 			},
 		});
 	}

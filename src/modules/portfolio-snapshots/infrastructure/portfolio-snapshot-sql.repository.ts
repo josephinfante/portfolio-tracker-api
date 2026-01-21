@@ -33,6 +33,15 @@ const toNumber = (value: unknown): number => {
 	return 0;
 };
 
+const snapshotSortColumns = {
+	snapshotDate: portfolioSnapshotsTable.snapshotDate,
+	createdAt: portfolioSnapshotsTable.createdAt,
+	updatedAt: portfolioSnapshotsTable.updatedAt,
+	totalValueUsd: portfolioSnapshotsTable.totalValueUsd,
+	totalValueBase: portfolioSnapshotsTable.totalValueBase,
+	fxUsdToBase: portfolioSnapshotsTable.fxUsdToBase,
+} as const;
+
 @injectable()
 export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotRepository {
 	constructor(@inject(TOKENS.Drizzle) private readonly db: Drizzle) {}
@@ -177,14 +186,22 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			.from(portfolioSnapshotsTable)
 			.where(where);
 
-		const order =
-			options?.order === "ASC" ? asc(portfolioSnapshotsTable.snapshotDate) : desc(portfolioSnapshotsTable.snapshotDate);
+		const sortColumn = options?.sortBy
+			? snapshotSortColumns[options.sortBy as keyof typeof snapshotSortColumns]
+			: undefined;
+		const order = sortColumn
+			? options?.sortDirection === "desc"
+				? desc(sortColumn)
+				: asc(sortColumn)
+			: options?.order === "ASC"
+				? asc(portfolioSnapshotsTable.snapshotDate)
+				: desc(portfolioSnapshotsTable.snapshotDate);
 
 		const baseQuery = this.db.select().from(portfolioSnapshotsTable).where(where).orderBy(order);
 
 		const rows =
-			options?.limit && options.limit > 0
-				? await baseQuery.limit(options.limit).offset(options.offset ?? 0)
+			options?.pageSize && options.pageSize > 0
+				? await baseQuery.limit(options.pageSize).offset(options.page ?? 0)
 				: await baseQuery;
 
 		return {
