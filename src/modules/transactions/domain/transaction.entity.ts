@@ -29,4 +29,9 @@ export interface TransactionEntity {
 		symbol: string;
 		name: string;
 	};
+
+	actions?: {
+		canReverse: boolean;
+		canAdjust: boolean;
+	};
 }

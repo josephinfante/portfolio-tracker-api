@@ -1,10 +1,12 @@
 import { TransactionEntity } from "./transaction.entity";
+import { TransactionDetailsRecord } from "./transaction-details.types";
 import { CreateTransactionInput, TransactionListFilters } from "./transaction.types";
 import { Drizzle } from "@shared/database/drizzle/client";
 import type { NodePgTransaction } from "drizzle-orm/node-postgres";
 
 export interface TransactionRepository {
 	findById(id: string): Promise<TransactionEntity | null>;
+	findDetailsById(id: string): Promise<TransactionDetailsRecord | null>;
 	findByUserId(
 		userId: string,
 		options?: TransactionListFilters,
