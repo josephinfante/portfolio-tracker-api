@@ -15,6 +15,8 @@ import { inject, injectable } from "tsyringe";
 import { D, toFixed } from "@shared/helpers/decimal";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
 
 @injectable()
 export class ExchangeAssetUseCase {
@@ -23,6 +25,7 @@ export class ExchangeAssetUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -115,7 +118,7 @@ export class ExchangeAssetUseCase {
 
 		const transactionDate = data.transactionDate ?? Date.now();
 
-		return await this.transactionRepository.runInTransaction(async (tx) => {
+		const sellTx = await this.transactionRepository.runInTransaction(async (tx) => {
 			const sellTotalAmount = data.price ? D(data.fromQuantity).mul(D(data.price)) : D(data.fromQuantity);
 			const sellTx = await this.transactionRepository.create(
 				{
@@ -158,13 +161,16 @@ export class ExchangeAssetUseCase {
 				);
 			}
 
+			const destinationTransactionType =
+				toAccount.platform?.type === PlatformTypes.bank ? TransactionType.DEPOSIT : TransactionType.BUY;
+
 			const buyTotalAmount = data.price ? D(data.toQuantity).mul(D(data.price)) : D(data.toQuantity);
 			await this.transactionRepository.create(
 				{
 					userId,
 					accountId: data.toAccountId,
 					assetId: data.toAssetId,
-					transactionType: TransactionType.BUY,
+					transactionType: destinationTransactionType,
 					correctionType: null,
 					referenceTxId: sellTx.id,
 					quantity: toFixed(D(data.toQuantity)),
@@ -181,6 +187,9 @@ export class ExchangeAssetUseCase {
 
 			return sellTx;
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.fromAccountId, data.toAccountId]);
+		return sellTx;
 	}
 
 	private assertAccountSupportsAsset(

@@ -16,6 +16,8 @@ import { D, toFixed } from "@shared/helpers/decimal";
 import { PlatformTypes } from "@modules/platforms/domain/platform.types";
 import { BusinessLogicError } from "@shared/errors/domain/business-logic.error";
 import { AssetType } from "@modules/assets/domain/asset.types";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
 
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
@@ -28,6 +30,7 @@ export class CreateTransactionUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.Drizzle) private db: Drizzle,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -129,7 +132,7 @@ export class CreateTransactionUseCase {
 		await this.balanceGuard.ensure(userId, deltas);
 
 		const transactionDate = data?.transactionDate ?? Date.now();
-		return await this.db.transaction(async (tx) => {
+		const transaction = await this.db.transaction(async (tx) => {
 			const transaction = await this.transactionRepository.create(
 				{
 					userId,
@@ -173,5 +176,8 @@ export class CreateTransactionUseCase {
 
 			return transaction;
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.accountId]);
+		return transaction;
 	}
 }

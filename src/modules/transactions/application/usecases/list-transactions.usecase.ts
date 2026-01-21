@@ -10,9 +10,20 @@ import {
 import { PaginatedResponse } from "@shared/types/paginated-response";
 import { TransactionEntity } from "@modules/transactions/domain/transaction.entity";
 import { buildPaginatedResponse } from "@shared/helpers/pagination";
+import type { SortDirection } from "@shared/types/sort";
 
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
+
+const buildActions = (correctionType: TransactionCorrectionType | null, hasReverse: boolean) => {
+	const isOriginal = correctionType === null;
+	const isReverse = correctionType === TransactionCorrectionType.REVERSE;
+	const status = "settled";
+	return {
+		canReverse: isOriginal && !hasReverse && status === "settled",
+		canAdjust: !isReverse && !hasReverse && status === "settled",
+	};
+};
 
 const parseNumber = (value: unknown) => {
 	if (typeof value === "number" && Number.isFinite(value)) {
@@ -25,6 +36,24 @@ const parseNumber = (value: unknown) => {
 	return undefined;
 };
 
+const normalizeSortDirection = (value: unknown): SortDirection | undefined => {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+
+	const normalized = value.toLowerCase();
+	return normalized === "asc" || normalized === "desc" ? (normalized as SortDirection) : undefined;
+};
+
+const normalizeSortBy = (value: unknown): string | undefined => {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : undefined;
+};
+
 @injectable()
 export class ListTransactionsUseCase {
 	constructor(@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository) {}
@@ -34,12 +63,11 @@ export class ListTransactionsUseCase {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
 
-		const rawLimit = options?.limit;
+		const rawLimit = options?.pageSize;
 		const parsedLimit = typeof rawLimit === "string" ? Number(rawLimit) : rawLimit;
-		const limit =
-			parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
+		const limit = parsedLimit !== undefined && Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 10;
 
-		const rawPage = options?.page ?? options?.offset;
+		const rawPage = options?.page;
 		const parsedPage = typeof rawPage === "string" ? Number(rawPage) : rawPage;
 		const page = parsedPage !== undefined && Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
 
@@ -48,9 +76,7 @@ export class ListTransactionsUseCase {
 
 		const rawType = options?.transactionType;
 		const transactionType =
-			typeof rawType === "string" && transactionTypeValues.has(rawType)
-				? (rawType as TransactionType)
-				: undefined;
+			typeof rawType === "string" && transactionTypeValues.has(rawType) ? (rawType as TransactionType) : undefined;
 
 		const rawCorrection = options?.correctionType;
 		const correctionType =
@@ -59,9 +85,7 @@ export class ListTransactionsUseCase {
 				: undefined;
 
 		const referenceTxId =
-			typeof options?.referenceTxId === "string" && options.referenceTxId.length
-				? options.referenceTxId
-				: undefined;
+			typeof options?.referenceTxId === "string" && options.referenceTxId.length ? options.referenceTxId : undefined;
 
 		const quantityMin = parseNumber(options?.quantityMin);
 		const quantityMax = parseNumber(options?.quantityMax);
@@ -70,18 +94,19 @@ export class ListTransactionsUseCase {
 		const startDate = parseNumber(options?.startDate);
 		const endDate = parseNumber(options?.endDate);
 
-		const paymentAssetId =
-			typeof options?.paymentAssetId === "string" && options.paymentAssetId.length
-				? options.paymentAssetId
-				: undefined;
+		const paymentAsset =
+			typeof options?.paymentAsset === "string" && options.paymentAsset.length ? options.paymentAsset : undefined;
 		const paymentQuantityMin = parseNumber(options?.paymentQuantityMin);
 		const paymentQuantityMax = parseNumber(options?.paymentQuantityMax);
+
+		const sortBy = normalizeSortBy(options?.sortBy);
+		const sortDirection = normalizeSortDirection(options?.sortDirection);
 
 		const sqlOffset = limit > 0 ? (page - 1) * limit : 0;
 
 		const { items, totalCount } = await this.transactionRepository.findByUserId(userId, {
-			limit,
-			offset: sqlOffset,
+			pageSize: limit,
+			page: sqlOffset,
 			account,
 			asset,
 			transactionType,
@@ -91,20 +116,33 @@ export class ListTransactionsUseCase {
 			quantityMax,
 			totalAmountMin,
 			totalAmountMax,
-			paymentAssetId,
+			paymentAsset,
 			paymentQuantityMin,
 			paymentQuantityMax,
 			startDate,
 			endDate,
+			sortBy,
+			sortDirection,
 		});
 
+		const reversedOriginalIds = new Set(
+			items
+				.filter((item) => item.correctionType === TransactionCorrectionType.REVERSE && item.referenceTxId)
+				.map((item) => item.referenceTxId as string),
+		);
+
+		const enrichedItems = items.map((item) => ({
+			...item,
+			actions: buildActions(item.correctionType, reversedOriginalIds.has(item.id)),
+		}));
+
 		return buildPaginatedResponse({
-			items,
+			items: enrichedItems,
 			totalCount,
 			limit,
 			offset: page,
 			meta: {
-				limit,
+				pageSize: limit,
 				page,
 				account,
 				asset,
@@ -115,11 +153,13 @@ export class ListTransactionsUseCase {
 				quantityMax,
 				totalAmountMin,
 				totalAmountMax,
-				paymentAssetId,
+				paymentAsset,
 				paymentQuantityMin,
 				paymentQuantityMax,
 				startDate,
 				endDate,
+				sortBy,
+				sortDirection,
 			},
 		});
 	}

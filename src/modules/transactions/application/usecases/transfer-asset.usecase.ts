@@ -15,6 +15,8 @@ import { PlatformTypes } from "@modules/platforms/domain/platform.types";
 import { D, toFixed } from "@shared/helpers/decimal";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
 
 @injectable()
 export class TransferAssetUseCase {
@@ -23,6 +25,7 @@ export class TransferAssetUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -102,14 +105,17 @@ export class TransferAssetUseCase {
 		await this.balanceGuard.ensure(userId, deltas);
 
 		const transactionDate = data.transactionDate ?? Date.now();
+		const samePlatform = fromAccount.platform?.type === toAccount.platform?.type;
+		const outgoingType = samePlatform ? TransactionType.TRANSFER_OUT : TransactionType.WITHDRAW;
+		const incomingType = samePlatform ? TransactionType.TRANSFER_IN : TransactionType.DEPOSIT;
 
-		return await this.transactionRepository.runInTransaction(async (tx) => {
+		const transferOut = await this.transactionRepository.runInTransaction(async (tx) => {
 			const transferOut = await this.transactionRepository.create(
 				{
 					userId,
 					accountId: data.fromAccountId,
 					assetId: data.assetId,
-					transactionType: TransactionType.TRANSFER_OUT,
+					transactionType: outgoingType,
 					correctionType: null,
 					referenceTxId: null,
 					quantity: toFixed(D(data.quantity).neg()),
@@ -149,7 +155,7 @@ export class TransferAssetUseCase {
 					userId,
 					accountId: data.toAccountId,
 					assetId: data.assetId,
-					transactionType: TransactionType.TRANSFER_IN,
+					transactionType: incomingType,
 					correctionType: null,
 					referenceTxId: transferOut.id,
 					quantity: toFixed(D(data.quantity)),
@@ -165,6 +171,9 @@ export class TransferAssetUseCase {
 
 			return transferOut;
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.fromAccountId, data.toAccountId]);
+		return transferOut;
 	}
 
 	private assertAccountSupportsAsset(

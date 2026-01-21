@@ -9,12 +9,15 @@ import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 import { D } from "@shared/helpers/decimal";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
 
 @injectable()
 export class ReverseTransactionUseCase {
 	constructor(
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(id: string, userId: string, input: unknown) {
@@ -61,12 +64,16 @@ export class ReverseTransactionUseCase {
 		await this.balanceGuard.ensure(userId, deltas);
 
 		const reason = result.data.reason ?? null;
-		return this.transactionRepository.runInTransaction(async (tx) => {
+		const reversed = await this.transactionRepository.runInTransaction(async (tx) => {
 			for (const item of relatedTransactions) {
 				await this.transactionRepository.reverse(item.id, reason, tx);
 			}
 
 			return this.transactionRepository.reverse(id, reason, tx);
 		});
+
+		const accountIds = [transaction.accountId, ...relatedTransactions.map((item) => item.accountId)];
+		await invalidateAccountHoldingsCache(this.redisClient, userId, accountIds);
+		return reversed;
 	}
 }

@@ -2,6 +2,7 @@ import { injectable } from "tsyringe";
 import { CreateTransactionUseCase } from "./usecases/create-transaction.usecase";
 import { ListTransactionsUseCase } from "./usecases/list-transactions.usecase";
 import { FindTransactionUseCase } from "./usecases/find-transaction.usecase";
+import { GetTransactionDetailsUseCase } from "./usecases/get-transaction-details.usecase";
 import { AdjustTransactionUseCase } from "./usecases/adjust-transaction.usecase";
 import { ReverseTransactionUseCase } from "./usecases/reverse-transaction.usecase";
 import { TransferAssetUseCase } from "./usecases/transfer-asset.usecase";
@@ -18,6 +19,7 @@ export class TransactionService {
 		private createTransactionUseCase: CreateTransactionUseCase,
 		private listTransactionsUseCase: ListTransactionsUseCase,
 		private findTransactionUseCase: FindTransactionUseCase,
+		private getTransactionDetailsUseCase: GetTransactionDetailsUseCase,
 		private adjustTransactionUseCase: AdjustTransactionUseCase,
 		private reverseTransactionUseCase: ReverseTransactionUseCase,
 		private transferAssetUseCase: TransferAssetUseCase,
@@ -39,6 +41,10 @@ export class TransactionService {
 
 	async findTransaction(id: string, userId: string): Promise<TransactionEntity> {
 		return await this.findTransactionUseCase.execute(id, userId);
+	}
+
+	async getTransactionDetails(id: string, userId: string) {
+		return await this.getTransactionDetailsUseCase.execute(id, userId);
 	}
 
 	async adjustTransaction(id: string, userId: string, input: unknown): Promise<TransactionEntity> {
