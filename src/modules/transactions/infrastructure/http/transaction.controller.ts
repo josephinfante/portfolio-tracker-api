@@ -22,7 +22,7 @@ export class TransactionController {
 	findById = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
 		const id = req.params.id as string;
-		const response = await this.transactionService.findTransaction(id, userId);
+		const response = await this.transactionService.getTransactionDetails(id, userId);
 		return res.status(200).success(response);
 	});
 
