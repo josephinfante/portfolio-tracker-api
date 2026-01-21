@@ -40,6 +40,21 @@ export class AccountController {
 		return res.status(200).success(response);
 	});
 
+	getHoldings = asyncHandler(async (req: Request, res: Response) => {
+		const userId = res.locals.user.id;
+		const id = req.params.id as string;
+		const quoteCurrency = req.query.quoteCurrency as string | undefined;
+		const response = await this.accountService.getAccountHoldings(userId, id, quoteCurrency);
+		return res.status(200).success(response);
+	});
+
+	listTransactions = asyncHandler(async (req: Request, res: Response) => {
+		const userId = res.locals.user.id;
+		const id = req.params.id as string;
+		const { meta, ...response } = await this.accountService.listAccountTransactions(userId, id, req.query);
+		return res.status(200).success(response, meta);
+	});
+
 	remove = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
 		const id = req.params.id as string;

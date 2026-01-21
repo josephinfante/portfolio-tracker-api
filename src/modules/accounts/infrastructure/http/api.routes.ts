@@ -12,6 +12,8 @@ export function createAccountApiRoutes() {
 	router.post("/", controller.create);
 	router.get("/", controller.list);
 	router.get("/:id/balance", controller.balance);
+	router.get("/:id/holdings", controller.getHoldings);
+	router.get("/:id/transactions", controller.listTransactions);
 	router.get("/:id", controller.findById);
 	router.patch("/:id", controller.update);
 	router.delete("/:id", controller.remove);

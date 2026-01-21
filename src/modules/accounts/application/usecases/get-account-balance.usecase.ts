@@ -8,6 +8,7 @@ import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
 import { AccountBalanceResponse } from "@modules/accounts/domain/account-balance.types";
+import { AssetType } from "@modules/assets/domain/asset.types";
 
 const transactionTypeSigns = new Map<TransactionType, number>([
 	[TransactionType.BUY, 1],
@@ -46,6 +47,8 @@ const normalizeQuantity = (
 
 	return quantity * sign;
 };
+
+const totalBalanceAssetTypes = new Set<AssetType>([AssetType.fiat, AssetType.stablecoin]);
 
 @injectable()
 export class GetAccountBalanceUseCase {
@@ -99,6 +102,18 @@ export class GetAccountBalanceUseCase {
 				asset: assetMap.get(assetId) ?? null,
 			}))
 			.filter((item) => item.quantity !== 0)
+			.filter((item) => item.asset && totalBalanceAssetTypes.has(item.asset.asset_type))
+			.map((item) => ({
+				assetId: item.assetId,
+				quantity: item.quantity,
+				asset: item.asset
+					? {
+							id: item.asset.id,
+							symbol: item.asset.symbol,
+							name: item.asset.name,
+					  }
+					: null,
+			}))
 			.sort((a, b) => a.assetId.localeCompare(b.assetId));
 
 		return {

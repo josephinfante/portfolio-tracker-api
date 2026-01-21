@@ -1,3 +1,5 @@
+import type { SortDirection } from "@shared/types/sort";
+
 export interface CreateAccountInput {
 	userId: string;
 	platformId: string;
@@ -8,10 +10,11 @@ export interface CreateAccountInput {
 export type UpdateAccountInput = Partial<Omit<CreateAccountInput, "userId">>;
 
 export interface AccountListFilters {
-	limit?: number;
-	offset?: number;
 	page?: number;
+	pageSize?: number;
 	search?: string;
 	platform?: string;
+	sortBy?: string;
+	sortDirection?: SortDirection;
 	[key: string]: any;
 }
