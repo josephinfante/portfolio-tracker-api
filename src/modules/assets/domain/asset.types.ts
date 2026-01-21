@@ -1,3 +1,5 @@
+import type { SortDirection } from "@shared/types/sort";
+
 export enum AssetType {
 	crypto = "crypto",
 	fiat = "fiat",
@@ -8,11 +10,12 @@ export enum AssetType {
 }
 
 export interface AssetListFilters {
-	limit?: number;
-	offset?: number;
 	page?: number;
+	pageSize?: number;
 	search?: string;
 	type?: AssetType;
+	sortBy?: string;
+	sortDirection?: SortDirection;
 	[key: string]: any;
 }
 

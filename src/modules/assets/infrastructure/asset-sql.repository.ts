@@ -4,11 +4,20 @@ import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { AssetEntity } from "../domain/asset.entity";
 import { assetsTable } from "./drizzle/asset.schema";
-import { and, eq, ilike, inArray, or, sql, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql, SQL } from "drizzle-orm";
 import { AssetMapper } from "./asset.mappers";
 import { AssetListFilters, CreateAssetInput, UpdateAssetInput } from "../domain/asset.types";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { v4 as uuidv4 } from "uuid";
+
+const assetSortColumns = {
+	id: assetsTable.id,
+	symbol: assetsTable.symbol,
+	name: assetsTable.name,
+	asset_type: assetsTable.asset_type,
+	createdAt: assetsTable.createdAt,
+	updatedAt: assetsTable.updatedAt,
+} as const;
 
 @injectable()
 export class AssetSqlRepository implements AssetRepository {
@@ -58,11 +67,17 @@ export class AssetSqlRepository implements AssetRepository {
 			dataQuery.where(where);
 		}
 
+		const sortColumn = options?.sortBy ? assetSortColumns[options.sortBy as keyof typeof assetSortColumns] : undefined;
+		if (sortColumn) {
+			const direction = options?.sortDirection === "desc" ? desc : asc;
+			dataQuery.orderBy(direction(sortColumn));
+		}
+
 		const [{ count }] = await countQuery;
 
 		const rows =
-			options?.limit && options.limit > 0
-				? await dataQuery.limit(options.limit).offset(options.offset ?? 0)
+			options?.pageSize && options.pageSize > 0
+				? await dataQuery.limit(options.pageSize).offset(options.page ?? 0)
 				: await dataQuery;
 
 		return {
@@ -72,9 +87,7 @@ export class AssetSqlRepository implements AssetRepository {
 	}
 
 	async findByIdentifiers(identifiers: string[]): Promise<AssetEntity[]> {
-		const normalized = identifiers
-			.map((value) => value.trim())
-			.filter((value) => value.length > 0);
+		const normalized = identifiers.map((value) => value.trim()).filter((value) => value.length > 0);
 
 		if (!normalized.length) {
 			return [];
