@@ -6,12 +6,14 @@ import { SnapshotListFilters } from "./portfolio-snapshot.types";
 export type CreatePortfolioSnapshotInput = {
 	userId: string;
 	snapshotDate: string; // YYYY-MM-DD
+	baseCurrency: string;
 	fxUsdToBase: number;
 	totalValueUsd: number;
 	totalValueBase: number;
 };
 
 export type UpdatePortfolioSnapshotInput = {
+	baseCurrency: string;
 	fxUsdToBase: number;
 	totalValueUsd: number;
 	totalValueBase: number;

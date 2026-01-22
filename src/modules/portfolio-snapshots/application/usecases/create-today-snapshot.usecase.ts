@@ -4,20 +4,28 @@ import { BuiltSnapshot } from "@modules/portfolio-snapshots/domain/portfolio-sna
 import { TOKENS } from "@shared/container/tokens";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
+import { UserRepository } from "@modules/users/domain/user.repository";
+import { NotFoundError } from "@shared/errors/domain/not-found.error";
 
 @injectable()
 export class CreateTodaySnapshotUseCase {
 	constructor(
 		private buildSnapshotUseCase: BuildSnapshotUseCase,
+		@inject(TOKENS.UserRepository) private readonly userRepository: UserRepository,
 		@inject(TOKENS.PortfolioSnapshotRepository) private portfolioSnapshotRepository: PortfolioSnapshotRepository,
 	) {}
 
-	async execute(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
+	async execute(userId: string): Promise<BuiltSnapshot> {
 		if (!userId || typeof userId !== "string") {
 			throw new ValidationError("Invalid user ID", "userId");
 		}
 
-		const snapshot = await this.buildSnapshotUseCase.execute(userId, timeZone);
+		const user = await this.userRepository.findById(userId);
+		if (!user) {
+			throw new NotFoundError(`User ${userId} not found`);
+		}
+
+		const snapshot = await this.buildSnapshotUseCase.execute(userId, user.timeZone);
 
 		await this.portfolioSnapshotRepository.runInTransaction(async (tx) => {
 			const existing = await this.portfolioSnapshotRepository.findByUserAndDate(
@@ -31,6 +39,7 @@ export class CreateTodaySnapshotUseCase {
 					{
 						userId,
 						snapshotDate: snapshot.snapshotDate,
+						baseCurrency: snapshot.baseCurrencyCode,
 						fxUsdToBase: snapshot.fxUsdToBase,
 						totalValueUsd: snapshot.totalValueUsd,
 						totalValueBase: snapshot.totalValueBase,
@@ -58,6 +67,7 @@ export class CreateTodaySnapshotUseCase {
 			await this.portfolioSnapshotRepository.updateSnapshot(
 				existing.id,
 				{
+					baseCurrency: snapshot.baseCurrencyCode,
 					fxUsdToBase: snapshot.fxUsdToBase,
 					totalValueUsd: snapshot.totalValueUsd,
 					totalValueBase: snapshot.totalValueBase,

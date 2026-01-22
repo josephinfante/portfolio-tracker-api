@@ -55,6 +55,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			id: row.id,
 			userId: row.userId,
 			snapshotDate: row.snapshotDate,
+			baseCurrency: row.baseCurrency,
 			fxUsdToBase: row.fxUsdToBase.toString(),
 			totalValueUsd: row.totalValueUsd.toString(),
 			totalValueBase: row.totalValueBase.toString(),
@@ -108,6 +109,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 				id: uuidv4(),
 				userId: input.userId,
 				snapshotDate: input.snapshotDate,
+				baseCurrency: input.baseCurrency,
 				fxUsdToBase: input.fxUsdToBase.toString(),
 				totalValueUsd: input.totalValueUsd.toString(),
 				totalValueBase: input.totalValueBase.toString(),
@@ -130,6 +132,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		const [row] = await db
 			.update(portfolioSnapshotsTable)
 			.set({
+				baseCurrency: input.baseCurrency,
 				fxUsdToBase: input.fxUsdToBase.toString(),
 				totalValueUsd: input.totalValueUsd.toString(),
 				totalValueBase: input.totalValueBase.toString(),

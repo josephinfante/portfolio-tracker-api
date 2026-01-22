@@ -9,13 +9,7 @@ export class PortfolioSnapshotController {
 
 	createToday = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
-		const timeZone =
-			typeof req.body?.timeZone === "string"
-				? req.body.timeZone
-				: typeof req.query?.timeZone === "string"
-					? req.query.timeZone
-					: undefined;
-		const response = await this.portfolioSnapshotService.createTodaySnapshot(userId, timeZone);
+		const response = await this.portfolioSnapshotService.createTodaySnapshot(userId);
 		return res.status(201).success(response);
 	});
 

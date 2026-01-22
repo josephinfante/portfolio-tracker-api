@@ -4,8 +4,8 @@ import { TOKENS } from "@shared/container/tokens";
 import { logger } from "@shared/logger";
 import { RedisClient } from "@shared/redis/redis.client";
 import { container } from "tsyringe";
-import { startExchangeRateCron } from "@modules/exchange-rates/infrastructure/cron/exchange-rate.cron";
 import { startAssetPriceCron } from "@modules/asset-prices/infrastructure/cron/asset-price.cron";
+import { startPortfolioSnapshotCron } from "@modules/portfolio-snapshots/infrastructure/cron/portfolio-snapshot.cron";
 
 export async function startServer() {
 	const app = createApp();
@@ -17,8 +17,8 @@ export async function startServer() {
 		logger.info(`Server running in ${environment.NODE_ENV} mode on port ${environment.PORT}`);
 	});
 
-	startExchangeRateCron();
 	startAssetPriceCron();
+	startPortfolioSnapshotCron();
 
 	const shutdown = async () => {
 		logger.info("Shutting down gracefully...");

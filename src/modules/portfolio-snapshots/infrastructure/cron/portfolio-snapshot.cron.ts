@@ -1,7 +1,9 @@
-import { SyncAssetPricesUseCase } from "@modules/asset-prices/application/usecases/sync-asset-prices.usecase";
-import { UpsertAssetPriceUseCase } from "@modules/asset-prices/application/usecases/upsert-asset-price.usecase";
+import { CreateTodaySnapshotUseCase } from "@modules/portfolio-snapshots/application/usecases/create-today-snapshot.usecase";
+import { usersTable } from "@shared/database/drizzle/schema";
 import { logger } from "@shared/logger";
 import { container } from "tsyringe";
+import { Drizzle } from "@shared/database/drizzle/client";
+import { TOKENS } from "@shared/container/tokens";
 
 const TIMEZONE = "America/New_York";
 const SCHEDULED_TIMES = new Set(["10:00", "13:00", "16:00"]);
@@ -35,7 +37,7 @@ const getTimeParts = (date: Date) => {
 	};
 };
 
-export function startAssetPriceCron(): void {
+export function startPortfolioSnapshotCron(): void {
 	if (intervalRef) {
 		return;
 	}
@@ -55,19 +57,28 @@ export function startAssetPriceCron(): void {
 		lastRunKey = runKey;
 
 		try {
-			const syncUseCase = container.resolve(SyncAssetPricesUseCase);
-			const upsertUseCase = container.resolve(UpsertAssetPriceUseCase);
+			const db = container.resolve<Drizzle>(TOKENS.Drizzle);
+			const createSnapshotUseCase = container.resolve(CreateTodaySnapshotUseCase);
 
-			const payloads = await syncUseCase.execute();
-			if (!payloads.length) {
-				logger.warn("Asset price sync returned no data");
+			const users = await db.select({ id: usersTable.id }).from(usersTable);
+			if (!users.length) {
+				logger.warn({ timeKey }, "Portfolio snapshot cron found no users");
 				return;
 			}
 
-			await upsertUseCase.execute(payloads);
-			logger.info({ count: payloads.length }, "Asset price sync completed");
+			let successCount = 0;
+			for (const user of users) {
+				try {
+					await createSnapshotUseCase.execute(user.id);
+					successCount += 1;
+				} catch (error) {
+					logger.error({ err: error, userId: user.id }, "Portfolio snapshot creation failed");
+				}
+			}
+
+			logger.info({ timeKey, count: successCount }, "Portfolio snapshot cron completed");
 		} catch (error) {
-			logger.error({ err: error }, "Asset price sync failed");
+			logger.error({ err: error, timeKey }, "Portfolio snapshot cron failed");
 		}
 	}, 60_000);
 }

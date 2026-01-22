@@ -3,6 +3,7 @@ export interface PorfolioSnapshot {
 	userId: string;
 
 	snapshotDate: string;
+	baseCurrency: string;
 	fxUsdToBase: string;
 
 	totalValueUsd: string;

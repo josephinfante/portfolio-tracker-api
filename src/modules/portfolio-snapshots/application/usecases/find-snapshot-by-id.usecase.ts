@@ -101,6 +101,7 @@ export class FindSnapshotByIdUseCase {
 		return {
 			id: snapshot.id,
 			snapshotDate: snapshot.snapshotDate,
+			baseCurrency: snapshot.baseCurrency,
 			fxUsdToBase: snapshot.fxUsdToBase,
 			totalValueUsd: snapshot.totalValueUsd,
 			totalValueBase: snapshot.totalValueBase,

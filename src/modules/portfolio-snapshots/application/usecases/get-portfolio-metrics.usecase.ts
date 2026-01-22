@@ -69,7 +69,7 @@ export class GetPortfolioMetricsUseCase {
 
 		let todaySnapshot = await this.portfolioSnapshotRepository.findByUserAndDate(userId, todayDate);
 		if (!todaySnapshot) {
-			const built = await this.createTodaySnapshotUseCase.execute(userId, resolvedTimeZone);
+			const built = await this.createTodaySnapshotUseCase.execute(userId);
 			todaySnapshot = await this.portfolioSnapshotRepository.findByUserAndDate(userId, built.snapshotDate);
 		}
 
