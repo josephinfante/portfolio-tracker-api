@@ -33,6 +33,15 @@ const toNumber = (value: unknown): number => {
 	return 0;
 };
 
+const snapshotSortColumns = {
+	snapshotDate: portfolioSnapshotsTable.snapshotDate,
+	createdAt: portfolioSnapshotsTable.createdAt,
+	updatedAt: portfolioSnapshotsTable.updatedAt,
+	totalValueUsd: portfolioSnapshotsTable.totalValueUsd,
+	totalValueBase: portfolioSnapshotsTable.totalValueBase,
+	fxUsdToBase: portfolioSnapshotsTable.fxUsdToBase,
+} as const;
+
 @injectable()
 export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotRepository {
 	constructor(@inject(TOKENS.Drizzle) private readonly db: Drizzle) {}
@@ -46,6 +55,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			id: row.id,
 			userId: row.userId,
 			snapshotDate: row.snapshotDate,
+			baseCurrency: row.baseCurrency,
 			fxUsdToBase: row.fxUsdToBase.toString(),
 			totalValueUsd: row.totalValueUsd.toString(),
 			totalValueBase: row.totalValueBase.toString(),
@@ -99,6 +109,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 				id: uuidv4(),
 				userId: input.userId,
 				snapshotDate: input.snapshotDate,
+				baseCurrency: input.baseCurrency,
 				fxUsdToBase: input.fxUsdToBase.toString(),
 				totalValueUsd: input.totalValueUsd.toString(),
 				totalValueBase: input.totalValueBase.toString(),
@@ -121,6 +132,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		const [row] = await db
 			.update(portfolioSnapshotsTable)
 			.set({
+				baseCurrency: input.baseCurrency,
 				fxUsdToBase: input.fxUsdToBase.toString(),
 				totalValueUsd: input.totalValueUsd.toString(),
 				totalValueBase: input.totalValueBase.toString(),
@@ -177,20 +189,55 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 			.from(portfolioSnapshotsTable)
 			.where(where);
 
-		const order =
-			options?.order === "ASC" ? asc(portfolioSnapshotsTable.snapshotDate) : desc(portfolioSnapshotsTable.snapshotDate);
+		const sortColumn = options?.sortBy
+			? snapshotSortColumns[options.sortBy as keyof typeof snapshotSortColumns]
+			: undefined;
+		const order = sortColumn
+			? options?.sortDirection === "desc"
+				? desc(sortColumn)
+				: asc(sortColumn)
+			: options?.order === "ASC"
+				? asc(portfolioSnapshotsTable.snapshotDate)
+				: desc(portfolioSnapshotsTable.snapshotDate);
 
 		const baseQuery = this.db.select().from(portfolioSnapshotsTable).where(where).orderBy(order);
 
 		const rows =
-			options?.limit && options.limit > 0
-				? await baseQuery.limit(options.limit).offset(options.offset ?? 0)
+			options?.pageSize && options.pageSize > 0
+				? await baseQuery.limit(options.pageSize).offset(options.page ?? 0)
 				: await baseQuery;
 
 		return {
 			items: rows.map((row) => this.mapSnapshot(row)),
 			totalCount: Number(count ?? 0),
 		};
+	}
+
+	async findLatestByUser(userId: string): Promise<PorfolioSnapshot | null> {
+		const rows = await this.db
+			.select()
+			.from(portfolioSnapshotsTable)
+			.where(eq(portfolioSnapshotsTable.userId, userId))
+			.orderBy(desc(portfolioSnapshotsTable.snapshotDate), desc(portfolioSnapshotsTable.createdAt))
+			.limit(1);
+
+		return rows[0] ? this.mapSnapshot(rows[0]) : null;
+	}
+
+	async findSnapshotsForPerformance(userId: string, startDate?: string): Promise<PorfolioSnapshot[]> {
+		const conditions: SQL[] = [eq(portfolioSnapshotsTable.userId, userId)];
+
+		if (startDate) {
+			conditions.push(gte(portfolioSnapshotsTable.snapshotDate, startDate));
+		}
+
+		const rows = await this.db
+			.select()
+			.from(portfolioSnapshotsTable)
+			.where(and(...conditions))
+			.orderBy(asc(portfolioSnapshotsTable.snapshotDate), asc(portfolioSnapshotsTable.createdAt));
+
+		return rows.map((row) => this.mapSnapshot(row));
 	}
 
 	async findWithDetails(
@@ -237,7 +284,7 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		const items = rows.map((row) => ({
 			accountId: row.account.id,
 			accountName: row.account.name,
-			accountCurrencyCode: row.account.currencyCode,
+			accountCurrencyCode: row.account.currencyCode ?? null,
 			assetId: row.asset.id,
 			assetSymbol: row.asset.symbol,
 			assetName: row.asset.name,

@@ -4,12 +4,21 @@ import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { AccountEntity } from "../domain/account.entity";
 import { accountsTable } from "./drizzle/account.schema";
-import { and, eq, ilike, or, SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, SQL, sql } from "drizzle-orm";
 import { AccountMapper } from "./account.mappers";
 import { AccountListFilters, CreateAccountInput, UpdateAccountInput } from "../domain/account.types";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { v4 as uuidv4 } from "uuid";
 import { platformsTable } from "@shared/database/drizzle/schema";
+
+const accountSortColumns = {
+	id: accountsTable.id,
+	name: accountsTable.name,
+	platformId: accountsTable.platformId,
+	currencyCode: accountsTable.currencyCode,
+	createdAt: accountsTable.createdAt,
+	updatedAt: accountsTable.updatedAt,
+} as const;
 
 @injectable()
 export class AccountSqlRepository implements AccountRepository {
@@ -19,21 +28,11 @@ export class AccountSqlRepository implements AccountRepository {
 		return Date.now();
 	}
 
-	private normalizeCurrencyCode(value?: string) {
-		const v = value?.trim().toUpperCase();
-		return v && v.length >= 3 ? v : undefined;
-	}
-
 	private buildWhere(userId: string, options?: AccountListFilters) {
 		const conditions: SQL[] = [eq(accountsTable.userId, userId)];
 
 		if (options?.search?.trim()) {
 			conditions.push(ilike(accountsTable.name, `%${options.search.trim()}%`));
-		}
-
-		const currency = this.normalizeCurrencyCode(options?.currencyCode);
-		if (currency) {
-			conditions.push(eq(accountsTable.currencyCode, currency));
 		}
 
 		if (options?.platform?.trim()) {
@@ -98,9 +97,15 @@ export class AccountSqlRepository implements AccountRepository {
 			.innerJoin(platformsTable, eq(accountsTable.platformId, platformsTable.id))
 			.where(where);
 
+		const sortColumn = options?.sortBy ? accountSortColumns[options.sortBy as keyof typeof accountSortColumns] : undefined;
+		if (sortColumn) {
+			const direction = options?.sortDirection === "desc" ? desc : asc;
+			baseQuery.orderBy(direction(sortColumn));
+		}
+
 		const rows =
-			options?.limit && options.limit > 0
-				? await baseQuery.limit(options.limit).offset(options.offset ?? 0)
+			options?.pageSize && options.pageSize > 0
+				? await baseQuery.limit(options.pageSize).offset(options.page ?? 0)
 				: await baseQuery;
 
 		return {
@@ -119,7 +124,7 @@ export class AccountSqlRepository implements AccountRepository {
 				userId: input.userId,
 				platformId: input.platformId,
 				name: input.name,
-				currencyCode: input.currencyCode,
+				currencyCode: input.currencyCode ?? null,
 				createdAt: now,
 				updatedAt: now,
 			})

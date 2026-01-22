@@ -41,6 +41,8 @@ export class SignUpUseCase {
 			lastName: data.lastName,
 			email: data.email,
 			password: passwordHash,
+			baseCurrency: data.baseCurrency,
+			timeZone: data.timeZone,
 		});
 
 		const token = await this.tokenService.sign({

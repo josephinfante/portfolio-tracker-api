@@ -25,10 +25,11 @@ export const transactionsTable = pgTable(
 		referenceTxId: varchar("reference_tx_id", { length: 36 }),
 
 		quantity: decimal("quantity", { precision: 30, scale: 10 }).notNull(),
-		unitPrice: decimal("unit_price", { precision: 30, scale: 10 }),
 		totalAmount: decimal("total_amount", { precision: 30, scale: 10 }).notNull(),
-
-		currencyCode: varchar("currency_code", { length: 10 }).notNull(),
+		paymentAssetId: varchar("payment_asset_id", { length: 36 })
+			.notNull()
+			.references(() => assetsTable.id, { onDelete: "cascade" }),
+		paymentQuantity: decimal("payment_quantity", { precision: 30, scale: 10 }).notNull(),
 		exchangeRate: decimal("exchange_rate", { precision: 30, scale: 10 }),
 
 		transactionDate: bigint("transaction_date", { mode: "number" }).notNull(),

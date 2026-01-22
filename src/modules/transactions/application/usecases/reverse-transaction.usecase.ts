@@ -9,12 +9,16 @@ import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 import { D } from "@shared/helpers/decimal";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 @injectable()
 export class ReverseTransactionUseCase {
 	constructor(
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(id: string, userId: string, input: unknown) {
@@ -42,17 +46,36 @@ export class ReverseTransactionUseCase {
 			throw new AuthorizationError("Access denied");
 		}
 
+		const related = await this.transactionRepository.findByUserId(userId, { referenceTxId: id });
+		const relatedTransactions = related.items.filter((item) => item.correctionType === null);
+
+		const transactionsToReverse = [...relatedTransactions, transaction];
+
 		const deltas: BalanceDelta[] = [];
-		const delta = D(transaction.quantity).neg();
-		if (delta.lt(0)) {
-			deltas.push({
-				accountId: transaction.accountId,
-				assetId: transaction.assetId,
-				delta: delta.toNumber(),
-			});
+		for (const item of transactionsToReverse) {
+			const delta = D(item.quantity).neg();
+			if (delta.lt(0)) {
+				deltas.push({
+					accountId: item.accountId,
+					assetId: item.assetId,
+					delta: delta.toNumber(),
+				});
+			}
 		}
 		await this.balanceGuard.ensure(userId, deltas);
 
-		return this.transactionRepository.reverse(id, result.data.reason ?? null);
+		const reason = result.data.reason ?? null;
+		const reversed = await this.transactionRepository.runInTransaction(async (tx) => {
+			for (const item of relatedTransactions) {
+				await this.transactionRepository.reverse(item.id, reason, tx);
+			}
+
+			return this.transactionRepository.reverse(id, reason, tx);
+		});
+
+		const accountIds = [transaction.accountId, ...relatedTransactions.map((item) => item.accountId)];
+		await invalidateAccountHoldingsCache(this.redisClient, userId, accountIds);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
+		return reversed;
 	}
 }

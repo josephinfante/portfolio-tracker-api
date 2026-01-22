@@ -6,12 +6,14 @@ import { SnapshotListFilters } from "./portfolio-snapshot.types";
 export type CreatePortfolioSnapshotInput = {
 	userId: string;
 	snapshotDate: string; // YYYY-MM-DD
+	baseCurrency: string;
 	fxUsdToBase: number;
 	totalValueUsd: number;
 	totalValueBase: number;
 };
 
 export type UpdatePortfolioSnapshotInput = {
+	baseCurrency: string;
 	fxUsdToBase: number;
 	totalValueUsd: number;
 	totalValueBase: number;
@@ -30,7 +32,7 @@ export type CreatePortfolioSnapshotItemInput = {
 export type SnapshotItemDetail = {
 	accountId: string;
 	accountName: string;
-	accountCurrencyCode: string;
+	accountCurrencyCode: string | null;
 	assetId: string;
 	assetSymbol: string;
 	assetName: string;
@@ -69,6 +71,8 @@ export interface PortfolioSnapshotRepository {
 		userId: string,
 		options?: SnapshotListFilters,
 	): Promise<{ items: PorfolioSnapshot[]; totalCount: number }>;
+	findLatestByUser(userId: string): Promise<PorfolioSnapshot | null>;
+	findSnapshotsForPerformance(userId: string, startDate?: string): Promise<PorfolioSnapshot[]>;
 	findWithDetails(
 		userId: string,
 		snapshotId: string,

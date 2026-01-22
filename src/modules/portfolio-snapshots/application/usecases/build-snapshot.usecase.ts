@@ -2,8 +2,11 @@ import { GetHoldingsByAccountUseCase } from "@modules/transactions/application/u
 import { GetAssetLivePriceUseCase } from "@modules/asset-prices/application/usecases/get-asset-live-price.usecase";
 import { GetFxUsdToBaseUseCase } from "@modules/exchange-rates/application/usecases/get-fx-usd-to-base.usecase";
 import { BuiltSnapshot } from "@modules/portfolio-snapshots/domain/portfolio-snapshot.entity";
+import { AssetRepository } from "@modules/assets/domain/asset.repository";
+import { AssetType } from "@modules/assets/domain/asset.types";
 import { ValidationError } from "@shared/errors/domain/validation.error";
-import { injectable } from "tsyringe";
+import { TOKENS } from "@shared/container/tokens";
+import { inject, injectable } from "tsyringe";
 import { D, toFixed } from "@shared/helpers/decimal";
 import { DateTime } from "luxon";
 import { getTodayInTimezone } from "@shared/helpers/date";
@@ -14,6 +17,7 @@ export class BuildSnapshotUseCase {
 		private getHoldingsByAccountUseCase: GetHoldingsByAccountUseCase,
 		private getAssetLivePriceUseCase: GetAssetLivePriceUseCase,
 		private getFxUsdToBaseUseCase: GetFxUsdToBaseUseCase,
+		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 	) {}
 
 	async execute(userId: string, timeZone?: string): Promise<BuiltSnapshot> {
@@ -43,21 +47,40 @@ export class BuildSnapshotUseCase {
 		}
 
 		const assetIds = Array.from(new Set(holdings.map((holding) => holding.assetId)));
-		const livePrices = await this.getAssetLivePriceUseCase.execute(assetIds);
+		const [livePrices, assets] = await Promise.all([
+			this.getAssetLivePriceUseCase.execute(assetIds),
+			this.assetRepository.findByIdentifiers(assetIds),
+		]);
 
 		const priceMap = new Map(livePrices.items.map((item) => [item.assetId, item]));
+		const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
 
 		let totalValueUsd = D(0);
 		let totalValueBase = D(0);
 
 		const items = holdings.map((holding) => {
 			const quantity = D(holding.quantity);
+			const asset = assetMap.get(holding.assetId);
 			const priceItem = priceMap.get(holding.assetId);
 			const rawPrice = priceItem?.price ?? 0;
 			const quoteCurrency = priceItem?.quoteCurrency?.toUpperCase();
+			const assetSymbol = asset?.symbol?.toUpperCase();
 
 			let priceUsd = D(rawPrice);
 			let priceBase = D(rawPrice).mul(D(fxUsdToBase));
+
+			if (asset?.asset_type === AssetType.fiat && assetSymbol) {
+				if (assetSymbol === "USD") {
+					priceUsd = D(1);
+					priceBase = D(fxUsdToBase);
+				} else if (assetSymbol === baseCurrencyCode) {
+					priceBase = D(1);
+					priceUsd = fxUsdToBase > 0 ? D(1).div(D(fxUsdToBase)) : D(0);
+				} else if (rawPrice > 0 && quoteCurrency === assetSymbol) {
+					priceUsd = D(1).div(D(rawPrice));
+					priceBase = priceUsd.mul(D(fxUsdToBase));
+				}
+			}
 
 			if (quoteCurrency === baseCurrencyCode && fxUsdToBase > 0) {
 				priceBase = D(rawPrice);

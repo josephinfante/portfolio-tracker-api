@@ -9,6 +9,7 @@ import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { applyPatch } from "@shared/helpers/apply-patch";
 import { AuthorizationError } from "@shared/errors/domain/authorization.error";
 import { currenciesDataset } from "@shared/dataset/currencies.dataset";
+import { PlatformTypes } from "@modules/platforms/domain/platform.types";
 
 const validCurrencyCodes = new Set(currenciesDataset.map((currency) => currency.code));
 
@@ -44,14 +45,7 @@ export class UpdateAccountUseCase {
 			throw new NotFoundError(`Account ${id} not found`);
 		}
 
-		if (data.currencyCode) {
-			const currencyCode = normalizeCurrencyCode(data.currencyCode);
-			if (!validCurrencyCodes.has(currencyCode)) {
-				throw new ValidationError("Invalid currency code", "currencyCode");
-			}
-			data.currencyCode = currencyCode;
-		}
-
+		let platformType = account.platform?.type;
 		if (data.platformId) {
 			const platform = await this.platformRepository.findById(data.platformId);
 			if (!platform) {
@@ -60,6 +54,26 @@ export class UpdateAccountUseCase {
 			if (platform.userId !== userId) {
 				throw new AuthorizationError("Access denied");
 			}
+			platformType = platform.type;
+		}
+
+		if (data.currencyCode !== undefined) {
+			if (data.currencyCode === null) {
+				if (platformType === PlatformTypes.bank) {
+					throw new ValidationError("Currency code is required for bank accounts", "currencyCode");
+				}
+			} else {
+				const currencyCode = normalizeCurrencyCode(data.currencyCode);
+				if (!validCurrencyCodes.has(currencyCode)) {
+					throw new ValidationError("Invalid currency code", "currencyCode");
+				}
+				data.currencyCode = currencyCode;
+			}
+		}
+
+		const resolvedCurrencyCode = data.currencyCode ?? account.currencyCode ?? null;
+		if (platformType === PlatformTypes.bank && !resolvedCurrencyCode) {
+			throw new ValidationError("Currency code is required for bank accounts", "currencyCode");
 		}
 
 		const patch = applyPatch(account, data, ["platformId", "name", "currencyCode"]);

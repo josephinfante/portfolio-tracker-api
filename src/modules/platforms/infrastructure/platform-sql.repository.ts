@@ -4,11 +4,20 @@ import { TOKENS } from "@shared/container/tokens";
 import { Drizzle } from "@shared/database/drizzle/client";
 import { PlatformEntity } from "../domain/platform.entity";
 import { platformsTable } from "./drizzle/platform.schema";
-import { and, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
 import { PlatformMapper } from "./platform.mappers";
 import { CreatePlatformInput, FindByUserIdFilters, UpdatePlatformInput } from "../domain/platform.types";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { v4 as uuidv4 } from "uuid";
+
+const platformSortColumns = {
+	id: platformsTable.id,
+	name: platformsTable.name,
+	type: platformsTable.type,
+	country: platformsTable.country,
+	createdAt: platformsTable.createdAt,
+	updatedAt: platformsTable.updatedAt,
+} as const;
 
 @injectable()
 export class PlatformSqlRepository implements PlatformRepository {
@@ -51,8 +60,18 @@ export class PlatformSqlRepository implements PlatformRepository {
 
 		const query = this.db.select().from(platformsTable).where(where);
 
+		const sortColumn = options?.sortBy
+			? platformSortColumns[options.sortBy as keyof typeof platformSortColumns]
+			: undefined;
+		if (sortColumn) {
+			const direction = options?.sortDirection === "desc" ? desc : asc;
+			query.orderBy(direction(sortColumn));
+		}
+
 		const rows =
-			options?.limit && options.limit > 0 ? await query.limit(options.limit).offset(options.offset ?? 0) : await query;
+			options?.pageSize && options.pageSize > 0
+				? await query.limit(options.pageSize).offset(options.page ?? 0)
+				: await query;
 
 		return {
 			items: PlatformMapper.toEntityList(rows),

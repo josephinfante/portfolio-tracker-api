@@ -3,6 +3,7 @@ export interface PorfolioSnapshot {
 	userId: string;
 
 	snapshotDate: string;
+	baseCurrency: string;
 	fxUsdToBase: string;
 
 	totalValueUsd: string;
@@ -53,7 +54,7 @@ export type SnapshotDetail = Omit<PorfolioSnapshot, "userId"> & {
 		accounts: Array<{
 			id: string;
 			name: string;
-			currencyCode: string;
+			currencyCode: string | null;
 			assets: Array<{
 				id: string;
 				symbol: string;

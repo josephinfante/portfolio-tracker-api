@@ -10,6 +10,9 @@ import { TransactionCorrectionType, TransactionType } from "@modules/transaction
 import { D, toFixed } from "@shared/helpers/decimal";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
 
@@ -18,6 +21,7 @@ export class AdjustTransactionUseCase {
 	constructor(
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(id: string, userId: string, input: unknown) {
@@ -55,8 +59,8 @@ export class AdjustTransactionUseCase {
 			data.quantity = toFixed(D(data.quantity as number));
 		}
 
-		if (data.unitPrice !== undefined) {
-			data.unitPrice = data.unitPrice === null ? null : toFixed(D(data.unitPrice as number));
+		if (data.paymentQuantity !== undefined) {
+			data.paymentQuantity = toFixed(D(data.paymentQuantity as number));
 		}
 
 		if (data.totalAmount !== undefined) {
@@ -73,9 +77,9 @@ export class AdjustTransactionUseCase {
 
 		const quantityRaw = (data.quantity ?? current.quantity) as string | number;
 		const quantity = D(quantityRaw);
-		const unitPriceRaw = (data.unitPrice ?? current.unitPrice) as string | number | null;
-		const unitPrice = unitPriceRaw === null ? null : D(unitPriceRaw);
-		const totalAmount = unitPrice ? quantity.mul(unitPrice) : quantity;
+		const paymentQuantityRaw = (data.paymentQuantity ?? current.paymentQuantity) as string | number;
+		const paymentQuantity = D(paymentQuantityRaw);
+		const totalAmount = paymentQuantity;
 
 		const deltas: BalanceDelta[] = [];
 		if (quantity.lt(0)) {
@@ -87,7 +91,7 @@ export class AdjustTransactionUseCase {
 		}
 		await this.balanceGuard.ensure(userId, deltas);
 
-		return await this.transactionRepository.create({
+		const adjustment = await this.transactionRepository.create({
 			userId,
 			accountId: current.accountId,
 			assetId: current.assetId,
@@ -95,12 +99,16 @@ export class AdjustTransactionUseCase {
 			correctionType: (data.correctionType as TransactionCorrectionType | null) ?? TransactionCorrectionType.ADJUST,
 			referenceTxId: id,
 			quantity: toFixed(quantity),
-			unitPrice: unitPrice ? toFixed(unitPrice) : null,
 			totalAmount: toFixed(totalAmount),
-			currencyCode: current.currencyCode,
+			paymentAssetId: (data.paymentAssetId as string | undefined) ?? current.paymentAssetId,
+			paymentQuantity: toFixed(paymentQuantity),
 			exchangeRate: data?.exchangeRate === undefined ? null : (data.exchangeRate as string | null),
 			transactionDate: (data?.transactionDate as number) ?? current.transactionDate,
 			notes: (data?.notes as string) || (data?.reason as string) || null,
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [current.accountId]);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
+		return adjustment;
 	}
 }

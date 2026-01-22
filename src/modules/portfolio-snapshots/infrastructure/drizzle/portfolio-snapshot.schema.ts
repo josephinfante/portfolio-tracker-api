@@ -10,6 +10,7 @@ export const portfolioSnapshotsTable = pgTable(
 			.references(() => usersTable.id, { onDelete: "cascade" }),
 
 		snapshotDate: date("snapshot_date").notNull(),
+		baseCurrency: varchar("base_currency", { length: 3 }).default("USD").notNull(),
 		fxUsdToBase: decimal("fx_usd_to_base", { precision: 30, scale: 10 }).notNull(),
 
 		totalValueUsd: decimal("total_value_usd", { precision: 30, scale: 10 }).notNull(),

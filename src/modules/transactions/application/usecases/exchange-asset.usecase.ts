@@ -15,8 +15,9 @@ import { inject, injectable } from "tsyringe";
 import { D, toFixed } from "@shared/helpers/decimal";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
-
-const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 @injectable()
 export class ExchangeAssetUseCase {
@@ -25,6 +26,7 @@ export class ExchangeAssetUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -116,10 +118,8 @@ export class ExchangeAssetUseCase {
 		await this.balanceGuard.ensure(userId, deltas);
 
 		const transactionDate = data.transactionDate ?? Date.now();
-		const fromCurrencyCode = normalizeCurrencyCode(fromAsset.symbol);
-		const toCurrencyCode = normalizeCurrencyCode(toAsset.symbol);
 
-		return await this.transactionRepository.runInTransaction(async (tx) => {
+		const sellTx = await this.transactionRepository.runInTransaction(async (tx) => {
 			const sellTotalAmount = data.price ? D(data.fromQuantity).mul(D(data.price)) : D(data.fromQuantity);
 			const sellTx = await this.transactionRepository.create(
 				{
@@ -130,9 +130,9 @@ export class ExchangeAssetUseCase {
 					correctionType: null,
 					referenceTxId: null,
 					quantity: toFixed(D(data.fromQuantity).neg()),
-					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
 					totalAmount: toFixed(sellTotalAmount),
-					currencyCode: fromCurrencyCode,
+					paymentAssetId: data.fromAssetId,
+					paymentQuantity: toFixed(sellTotalAmount),
 					exchangeRate:
 						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
@@ -141,27 +141,29 @@ export class ExchangeAssetUseCase {
 				tx,
 			);
 
-			if (data.fee && feeAsset) {
-				const feeCurrencyCode = normalizeCurrencyCode(feeAsset.symbol);
-				await this.transactionRepository.create(
-					{
-						userId,
-						accountId: data.fromAccountId,
-						assetId: data.fee.assetId,
+				if (data.fee && feeAsset) {
+					await this.transactionRepository.create(
+						{
+							userId,
+							accountId: data.fromAccountId,
+							assetId: data.fee.assetId,
 						transactionType: TransactionType.FEE,
-						correctionType: null,
-						referenceTxId: sellTx.id,
-						quantity: toFixed(D(data.fee.amount).neg()),
-						unitPrice: "1",
-						totalAmount: toFixed(D(data.fee.amount)),
-						currencyCode: feeCurrencyCode,
-						exchangeRate: null,
-						transactionDate,
-						notes: `Fee for exchange ${sellTx.id}`,
+							correctionType: null,
+							referenceTxId: sellTx.id,
+							quantity: toFixed(D(data.fee.amount).neg()),
+							totalAmount: toFixed(D(data.fee.amount)),
+							paymentAssetId: data.fee.assetId,
+							paymentQuantity: toFixed(D(data.fee.amount)),
+							exchangeRate: null,
+							transactionDate,
+							notes: `Fee for exchange ${sellTx.id}`,
 					},
 					tx,
 				);
 			}
+
+			const destinationTransactionType =
+				toAccount.platform?.type === PlatformTypes.bank ? TransactionType.DEPOSIT : TransactionType.BUY;
 
 			const buyTotalAmount = data.price ? D(data.toQuantity).mul(D(data.price)) : D(data.toQuantity);
 			await this.transactionRepository.create(
@@ -169,13 +171,13 @@ export class ExchangeAssetUseCase {
 					userId,
 					accountId: data.toAccountId,
 					assetId: data.toAssetId,
-					transactionType: TransactionType.BUY,
+					transactionType: destinationTransactionType,
 					correctionType: null,
 					referenceTxId: sellTx.id,
 					quantity: toFixed(D(data.toQuantity)),
-					unitPrice: data.price === undefined || data.price === null ? null : toFixed(D(data.price)),
 					totalAmount: toFixed(buyTotalAmount),
-					currencyCode: toCurrencyCode,
+					paymentAssetId: data.toAssetId,
+					paymentQuantity: toFixed(buyTotalAmount),
 					exchangeRate:
 						data.exchangeRate === undefined || data.exchangeRate === null ? null : toFixed(D(data.exchangeRate)),
 					transactionDate,
@@ -186,17 +188,31 @@ export class ExchangeAssetUseCase {
 
 			return sellTx;
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.fromAccountId, data.toAccountId]);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
+		return sellTx;
 	}
 
 	private assertAccountSupportsAsset(
-		account: { id: string; platform?: { type: string } },
-		asset: { asset_type: AssetType },
+		account: { id: string; platform?: { type: string }; currencyCode?: string | null },
+		asset: { asset_type: AssetType; symbol: string },
 		label: string,
 	) {
 		const platformType = account.platform?.type;
 
 		if (platformType === PlatformTypes.bank && asset.asset_type !== AssetType.fiat) {
 			throw new BusinessLogicError(`The ${label} account does not support this asset type`);
+		}
+
+		if (platformType === PlatformTypes.bank) {
+			const currencyCode = account.currencyCode?.toUpperCase();
+			if (!currencyCode) {
+				throw new BusinessLogicError(`The ${label} account requires a currency code`);
+			}
+			if (asset.symbol.toUpperCase() !== currencyCode) {
+				throw new BusinessLogicError(`The ${label} account only supports ${currencyCode} assets`);
+			}
 		}
 	}
 }

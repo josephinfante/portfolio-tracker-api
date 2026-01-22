@@ -1,3 +1,5 @@
+import type { SortDirection } from "@shared/types/sort";
+
 export enum TransactionType {
 	BUY = "buy",
 	SELL = "sell",
@@ -38,18 +40,17 @@ export interface CreateTransactionInput {
 	correctionType: TransactionCorrectionType | null;
 	referenceTxId: string | null;
 	quantity: string;
-	unitPrice: string | null;
 	totalAmount: string;
-	currencyCode: string;
+	paymentAssetId: string;
+	paymentQuantity: string;
 	exchangeRate: string | null;
 	transactionDate: number; // unix timestamp
 	notes: string | null;
 }
 
 export interface TransactionListFilters {
-	limit?: number;
-	offset?: number;
 	page?: number;
+	pageSize?: number;
 	account?: string;
 	asset?: string;
 	transactionType?: TransactionType;
@@ -57,12 +58,14 @@ export interface TransactionListFilters {
 	referenceTxId?: string;
 	quantityMin?: number;
 	quantityMax?: number;
-	unitPriceMin?: number;
-	unitPriceMax?: number;
 	totalAmountMin?: number;
 	totalAmountMax?: number;
-	currencyCode?: string;
+	paymentAsset?: string;
+	paymentQuantityMin?: number;
+	paymentQuantityMax?: number;
 	startDate?: number; // unix timestamp
 	endDate?: number; // unix timestamp
+	sortBy?: string;
+	sortDirection?: SortDirection;
 	[key: string]: any;
 }

@@ -10,6 +10,7 @@ export class UserMapper {
 			email: row.email,
 			passwordHash: row.passwordHash,
 			baseCurrency: row.baseCurrency,
+			timeZone: row.timeZone,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 		};

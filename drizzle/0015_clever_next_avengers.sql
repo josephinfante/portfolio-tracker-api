@@ -1,0 +1,1 @@
+ALTER TABLE "portfolio_snapshot" ADD COLUMN "base_currency" varchar(3) DEFAULT 'USD' NOT NULL;

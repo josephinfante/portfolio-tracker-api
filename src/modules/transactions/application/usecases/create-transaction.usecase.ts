@@ -13,11 +13,15 @@ import { Drizzle } from "@shared/database/drizzle/client";
 import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 import { D, toFixed } from "@shared/helpers/decimal";
+import { PlatformTypes } from "@modules/platforms/domain/platform.types";
+import { BusinessLogicError } from "@shared/errors/domain/business-logic.error";
+import { AssetType } from "@modules/assets/domain/asset.types";
+import { RedisClient } from "@shared/redis/redis.client";
+import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
-
-const normalizeCurrencyCode = (code: string) => code.trim().toUpperCase();
 
 @injectable()
 export class CreateTransactionUseCase {
@@ -27,6 +31,7 @@ export class CreateTransactionUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.Drizzle) private db: Drizzle,
 		@inject(TOKENS.BalanceGuardService) private balanceGuard: BalanceGuardService,
+		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
 	async execute(userId: string, input: unknown) {
@@ -51,7 +56,6 @@ export class CreateTransactionUseCase {
 			throw new ValidationError("Invalid correction type", "correctionType");
 		}
 
-		const currencyCode = normalizeCurrencyCode(data.currencyCode);
 		const account = await this.accountRepository.findById(data.accountId);
 		if (!account) {
 			throw new NotFoundError(`Account ${data.accountId} not found`);
@@ -64,12 +68,48 @@ export class CreateTransactionUseCase {
 			throw new NotFoundError(`Asset ${data.assetId} not found`);
 		}
 
+		const isFiatAsset = asset.asset_type === AssetType.fiat;
+		if (!isFiatAsset && !data.paymentAssetId) {
+			throw new ValidationError("Payment asset is required", "paymentAssetId");
+		}
+
+		const resolvedPaymentAssetId = data.paymentAssetId ?? data.assetId;
+		if (isFiatAsset && data.paymentAssetId && data.paymentAssetId !== data.assetId) {
+			throw new ValidationError("Payment asset must match asset for fiat transactions", "paymentAssetId");
+		}
+
+		const paymentAsset =
+			resolvedPaymentAssetId === asset.id ? asset : await this.assetRepository.findById(resolvedPaymentAssetId);
+		if (!paymentAsset) {
+			throw new NotFoundError(`Asset ${resolvedPaymentAssetId} not found`);
+		}
+
+		if (isFiatAsset) {
+			const quantity = D(data.quantity);
+			const paymentQuantity = data.paymentQuantity === undefined ? quantity : D(data.paymentQuantity);
+			if (!paymentQuantity.eq(quantity)) {
+				throw new ValidationError("Payment quantity must match quantity for fiat transactions", "paymentQuantity");
+			}
+		}
+
+		if (account.platform?.type === PlatformTypes.bank) {
+			const currencyCode = account.currencyCode?.toUpperCase();
+			if (!currencyCode) {
+				throw new BusinessLogicError("Bank accounts require a currency code");
+			}
+			if (asset.symbol.toUpperCase() !== currencyCode) {
+				throw new BusinessLogicError(`Bank accounts only support ${currencyCode} assets`);
+			}
+		}
+
 		const feeAsset = data.fee ? await this.assetRepository.findById(data.fee.assetId) : null;
 		if (data.fee && !feeAsset) {
 			throw new NotFoundError(`Asset ${data.fee.assetId} not found`);
 		}
 
-		const totalAmount = data?.unitPrice ? D(data.quantity).mul(D(data.unitPrice)) : D(data.quantity);
+		const paymentQuantity = D(
+			isFiatAsset ? data.quantity : data.paymentQuantity ?? data.quantity,
+		);
 
 		const deltas: BalanceDelta[] = [];
 		const quantityDelta = D(data.quantity);
@@ -92,7 +132,8 @@ export class CreateTransactionUseCase {
 		}
 		await this.balanceGuard.ensure(userId, deltas);
 
-		return await this.db.transaction(async (tx) => {
+		const transactionDate = data?.transactionDate ?? Date.now();
+		const transaction = await this.db.transaction(async (tx) => {
 			const transaction = await this.transactionRepository.create(
 				{
 					userId,
@@ -102,12 +143,12 @@ export class CreateTransactionUseCase {
 					correctionType: (data.correctionType as TransactionCorrectionType | null) ?? null,
 					referenceTxId: data.referenceTxId ?? null,
 					quantity: toFixed(D(data.quantity)),
-					unitPrice: data.unitPrice === null || data.unitPrice === undefined ? null : toFixed(D(data.unitPrice)),
-					totalAmount: toFixed(totalAmount),
-					currencyCode,
+					totalAmount: toFixed(paymentQuantity),
+					paymentAssetId: resolvedPaymentAssetId,
+					paymentQuantity: toFixed(paymentQuantity),
 					exchangeRate:
 						data.exchangeRate === null || data.exchangeRate === undefined ? null : toFixed(D(data.exchangeRate)),
-					transactionDate: data.transactionDate,
+					transactionDate,
 					notes: data.notes ?? null,
 				},
 				tx,
@@ -123,11 +164,11 @@ export class CreateTransactionUseCase {
 						correctionType: null,
 						referenceTxId: transaction.id,
 						quantity: toFixed(D(data.fee.quantity).neg()),
-						unitPrice: "1",
 						totalAmount: toFixed(D(data.fee.quantity)),
-						currencyCode: feeAsset.symbol.trim().toUpperCase(),
+						paymentAssetId: data.fee.assetId,
+						paymentQuantity: toFixed(D(data.fee.quantity)),
 						exchangeRate: null,
-						transactionDate: data.transactionDate,
+						transactionDate,
 						notes: `Fee for transaction ${transaction.id}`,
 					},
 					tx,
@@ -136,5 +177,9 @@ export class CreateTransactionUseCase {
 
 			return transaction;
 		});
+
+		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.accountId]);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
+		return transaction;
 	}
 }

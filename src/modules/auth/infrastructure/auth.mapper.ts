@@ -8,6 +8,8 @@ export class AuthMapper {
 				firstName: user.firstName,
 				lastName: user.lastName,
 				email: user.email,
+				baseCurrency: user.baseCurrency,
+				timeZone: user.timeZone,
 			},
 			token,
 		};

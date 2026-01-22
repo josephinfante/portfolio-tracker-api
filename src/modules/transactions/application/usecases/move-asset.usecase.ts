@@ -175,14 +175,24 @@ export class MoveAssetUseCase {
 	}
 
 	private assertAccountSupportsAsset(
-		account: { id: string; platform?: { type: string } },
-		asset: { asset_type: AssetType },
+		account: { id: string; platform?: { type: string }; currencyCode?: string | null },
+		asset: { asset_type: AssetType; symbol: string },
 		label: string,
 	) {
 		const platformType = account.platform?.type;
 
 		if (platformType === PlatformTypes.bank && asset.asset_type !== AssetType.fiat) {
 			throw new BusinessLogicError(`The ${label} account does not support this asset type`);
+		}
+
+		if (platformType === PlatformTypes.bank) {
+			const currencyCode = account.currencyCode?.toUpperCase();
+			if (!currencyCode) {
+				throw new BusinessLogicError(`The ${label} account requires a currency code`);
+			}
+			if (asset.symbol.toUpperCase() !== currencyCode) {
+				throw new BusinessLogicError(`The ${label} account only supports ${currencyCode} assets`);
+			}
 		}
 	}
 }

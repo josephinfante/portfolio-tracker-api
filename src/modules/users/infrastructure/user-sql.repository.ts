@@ -43,6 +43,7 @@ export class UserSqlRepository implements UserRepository {
 				email: input.email,
 				passwordHash: input.password,
 				baseCurrency: input.baseCurrency ?? "USD",
+				timeZone: input.timeZone ?? "America/Los_Angeles",
 
 				createdAt: now,
 				updatedAt: now,

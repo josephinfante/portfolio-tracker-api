@@ -8,6 +8,7 @@ export const usersTable = pgTable("users", {
 	email: varchar("email", { length: 255 }).notNull().unique(),
 	passwordHash: varchar("password_hash", { length: 255 }).notNull(),
 	baseCurrency: varchar("base_currency", { length: 3 }).default("USD").notNull(),
+	timeZone: varchar("time_zone", { length: 255 }).default("America/Los_Angeles").notNull(),
 
 	createdAt: bigint("created_at", { mode: "number" }).notNull(),
 	updatedAt: bigint("updated_at", { mode: "number" }).notNull(),

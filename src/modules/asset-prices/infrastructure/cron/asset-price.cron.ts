@@ -3,13 +3,13 @@ import { UpsertAssetPriceUseCase } from "@modules/asset-prices/application/useca
 import { logger } from "@shared/logger";
 import { container } from "tsyringe";
 
-const TIMEZONE = "America/Lima";
-const SCHEDULED_TIMES = new Set(["09:00", "13:30", "18:00"]);
+const TIMEZONE = "America/New_York";
+const SCHEDULED_TIMES = new Set(["10:00", "13:00", "16:00"]);
 
 let lastRunKey: string | null = null;
 let intervalRef: NodeJS.Timeout | null = null;
 
-const getLimaParts = (date: Date) => {
+const getTimeParts = (date: Date) => {
 	const formatter = new Intl.DateTimeFormat("en-GB", {
 		timeZone: TIMEZONE,
 		hour12: false,
@@ -41,7 +41,7 @@ export function startAssetPriceCron(): void {
 	}
 
 	intervalRef = setInterval(async () => {
-		const { dateKey, timeKey } = getLimaParts(new Date());
+		const { dateKey, timeKey } = getTimeParts(new Date());
 
 		if (!SCHEDULED_TIMES.has(timeKey)) {
 			return;

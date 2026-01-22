@@ -61,20 +61,24 @@ export abstract class BaseError extends Error implements ISerializableError {
 	 */
 	public toClientSafe(): Partial<ISerializableError> {
 		const message = domainErrorsMap.includes(this.name) ? this.message : "An unexpected error occurred.";
+		const isValidationError = this.name === "ValidationError";
 		return {
 			name: this.name,
 			message,
 			statusCode: this.statusCode,
 			code: this.code,
+			...(isValidationError && { details: this.metadata.context }),
 		};
 	}
 
 	public toDevelopSafe(): Partial<ISerializableError> {
+		const isValidationError = this.name === "ValidationError";
 		return {
 			name: this.name,
 			message: this.message,
 			statusCode: this.statusCode,
 			code: this.code,
+			...(isValidationError && { details: this.metadata.context }),
 			metadata: this.metadata,
 		};
 	}

@@ -6,6 +6,7 @@ export interface UserEntity {
 	email: string;
 	passwordHash: string;
 	baseCurrency: string;
+	timeZone: string;
 
 	createdAt: number; // unix timestamp
 	updatedAt: number; // unix timestamp

@@ -13,7 +13,7 @@ export const accountsTable = pgTable(
 			.references(() => platformsTable.id, { onDelete: "cascade" }),
 
 		name: varchar("name", { length: 100 }).notNull(),
-		currencyCode: varchar("currency_code", { length: 3 }).notNull(),
+		currencyCode: varchar("currency_code", { length: 3 }),
 
 		createdAt: bigint("created_at", { mode: "number" }).notNull(),
 		updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
