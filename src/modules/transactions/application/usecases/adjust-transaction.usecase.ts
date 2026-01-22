@@ -12,6 +12,7 @@ import { BalanceGuardService } from "../services/balance-guard.service";
 import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 import { RedisClient } from "@shared/redis/redis.client";
 import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
 
@@ -107,6 +108,7 @@ export class AdjustTransactionUseCase {
 		});
 
 		await invalidateAccountHoldingsCache(this.redisClient, userId, [current.accountId]);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
 		return adjustment;
 	}
 }

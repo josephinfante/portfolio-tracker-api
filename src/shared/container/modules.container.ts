@@ -18,6 +18,9 @@ import { createAssetPriceApiRoutes } from "@modules/asset-prices/infrastructure/
 import { createPortfolioSnapshotApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/api.routes";
 import { registerPortfolioSnapshotModule } from "@modules/portfolio-snapshots";
 import { createMetricsApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/metrics.routes";
+import { createPerformanceApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/performance.routes";
+import { createAllocationApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/allocation.routes";
+import { createDistributionApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/distribution.routes";
 import { createCurrencyApiRoutes } from "@modules/currencies/infrastructure/http/api.routes";
 import { createCountryApiRoutes } from "@modules/countries/infrastructure/http/api.routes";
 import { Router } from "express";
@@ -46,6 +49,9 @@ export function getModuleRouters(): { path: string; router: Router }[] {
 		{ path: "/api/assets", router: createAssetApiRoutes() },
 		{ path: "/api/transactions", router: createTransactionApiRoutes() },
 		{ path: "/api/metrics", router: createMetricsApiRoutes() },
+		{ path: "/api/allocation", router: createAllocationApiRoutes() },
+		{ path: "/api/performance", router: createPerformanceApiRoutes() },
+		{ path: "/api/distribution", router: createDistributionApiRoutes() },
 		{ path: "/api/exchange-rates", router: createExchangeRateApiRoutes() },
 		{ path: "/api/asset-prices", router: createAssetPriceApiRoutes() },
 		{ path: "/api/portfolio-snapshots", router: createPortfolioSnapshotApiRoutes() },

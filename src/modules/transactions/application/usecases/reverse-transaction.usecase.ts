@@ -11,6 +11,7 @@ import { BalanceDelta } from "@modules/transactions/domain/balance.types";
 import { D } from "@shared/helpers/decimal";
 import { RedisClient } from "@shared/redis/redis.client";
 import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 @injectable()
 export class ReverseTransactionUseCase {
@@ -74,6 +75,7 @@ export class ReverseTransactionUseCase {
 
 		const accountIds = [transaction.accountId, ...relatedTransactions.map((item) => item.accountId)];
 		await invalidateAccountHoldingsCache(this.redisClient, userId, accountIds);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
 		return reversed;
 	}
 }

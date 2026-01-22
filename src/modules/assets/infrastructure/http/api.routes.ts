@@ -11,6 +11,7 @@ export function createAssetApiRoutes() {
 
 	router.post("/", controller.create);
 	router.get("/", controller.list);
+	router.get("/:id/details", controller.getAssetDetails);
 	router.get("/:id", controller.findById);
 	router.patch("/:id", controller.update);
 	router.delete("/:id", controller.remove);

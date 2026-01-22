@@ -18,6 +18,7 @@ import { BusinessLogicError } from "@shared/errors/domain/business-logic.error";
 import { AssetType } from "@modules/assets/domain/asset.types";
 import { RedisClient } from "@shared/redis/redis.client";
 import { invalidateAccountHoldingsCache } from "../helpers/invalidate-account-holdings-cache";
+import { invalidateAssetAllocationCache } from "../helpers/invalidate-asset-allocation-cache";
 
 const transactionTypeValues = new Set(Object.values(TransactionType));
 const correctionTypeValues = new Set(Object.values(TransactionCorrectionType));
@@ -178,6 +179,7 @@ export class CreateTransactionUseCase {
 		});
 
 		await invalidateAccountHoldingsCache(this.redisClient, userId, [data.accountId]);
+		await invalidateAssetAllocationCache(this.redisClient, userId);
 		return transaction;
 	}
 }
