@@ -23,6 +23,7 @@ import { createAllocationApiRoutes } from "@modules/portfolio-snapshots/infrastr
 import { createDistributionApiRoutes } from "@modules/portfolio-snapshots/infrastructure/http/distribution.routes";
 import { createCurrencyApiRoutes } from "@modules/currencies/infrastructure/http/api.routes";
 import { createCountryApiRoutes } from "@modules/countries/infrastructure/http/api.routes";
+import { createTimeZoneApiRoutes } from "@modules/time-zones/infrastructure/http/api.routes";
 import { Router } from "express";
 import { container } from "tsyringe";
 import { TOKENS } from "./tokens";
@@ -57,5 +58,6 @@ export function getModuleRouters(): { path: string; router: Router }[] {
 		{ path: "/api/portfolio-snapshots", router: createPortfolioSnapshotApiRoutes() },
 		{ path: "/api/currencies", router: createCurrencyApiRoutes() },
 		{ path: "/api/countries", router: createCountryApiRoutes() },
+		{ path: "/api/time-zones", router: createTimeZoneApiRoutes() },
 	];
 }

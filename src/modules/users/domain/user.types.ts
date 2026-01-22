@@ -4,6 +4,7 @@ export interface CreateUserInput {
 	email: string;
 	password: string;
 	baseCurrency?: string;
+	timeZone?: string;
 }
 
 export interface UserName {

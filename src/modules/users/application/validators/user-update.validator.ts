@@ -6,6 +6,7 @@ export const UpdateUserSchema = z.object({
 	lastName: z.string().min(1, "Last name is required").optional(),
 	email: z.string().regex(globalRegex.email, "Invalid email format").optional(),
 	baseCurrency: z.string().length(3, "Base currency must be 3 characters").optional(),
+	timeZone: z.string().min(1, "Time zone is required").optional(),
 	oldPassword: z.string().min(8, "Old password must be at least 8 characters long").optional(),
 	newPassword: z
 		.string()

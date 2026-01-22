@@ -14,6 +14,7 @@ export const SignUpSchema = z.object({
 			"Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
 		),
 	baseCurrency: z.string().optional().default("USD"),
+	timeZone: z.string().optional().default("America/Los_Angeles"),
 });
 
 export type SignUpDTO = z.infer<typeof SignUpSchema>;

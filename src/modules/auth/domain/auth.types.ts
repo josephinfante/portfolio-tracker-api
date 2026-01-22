@@ -5,6 +5,8 @@ export interface SignUpInput {
 	lastName: string;
 	email: string;
 	password: string;
+	baseCurrency?: string;
+	timeZone?: string;
 }
 
 export interface SignInInput {
@@ -18,6 +20,7 @@ export interface AuthResponse {
 		lastName: string;
 		email: string;
 		baseCurrency: string;
+		timeZone: string;
 	};
 	token: string;
 }
