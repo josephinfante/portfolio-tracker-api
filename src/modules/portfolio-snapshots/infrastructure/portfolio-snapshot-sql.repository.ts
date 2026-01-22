@@ -210,6 +210,33 @@ export class PortfolioSnapshotSqlRepository implements PortfolioSnapshotReposito
 		};
 	}
 
+	async findLatestByUser(userId: string): Promise<PorfolioSnapshot | null> {
+		const rows = await this.db
+			.select()
+			.from(portfolioSnapshotsTable)
+			.where(eq(portfolioSnapshotsTable.userId, userId))
+			.orderBy(desc(portfolioSnapshotsTable.snapshotDate), desc(portfolioSnapshotsTable.createdAt))
+			.limit(1);
+
+		return rows[0] ? this.mapSnapshot(rows[0]) : null;
+	}
+
+	async findSnapshotsForPerformance(userId: string, startDate?: string): Promise<PorfolioSnapshot[]> {
+		const conditions: SQL[] = [eq(portfolioSnapshotsTable.userId, userId)];
+
+		if (startDate) {
+			conditions.push(gte(portfolioSnapshotsTable.snapshotDate, startDate));
+		}
+
+		const rows = await this.db
+			.select()
+			.from(portfolioSnapshotsTable)
+			.where(and(...conditions))
+			.orderBy(asc(portfolioSnapshotsTable.snapshotDate), asc(portfolioSnapshotsTable.createdAt));
+
+		return rows.map((row) => this.mapSnapshot(row));
+	}
+
 	async findWithDetails(
 		userId: string,
 		snapshotId: string,

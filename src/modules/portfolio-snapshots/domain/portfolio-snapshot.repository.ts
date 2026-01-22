@@ -69,6 +69,8 @@ export interface PortfolioSnapshotRepository {
 		userId: string,
 		options?: SnapshotListFilters,
 	): Promise<{ items: PorfolioSnapshot[]; totalCount: number }>;
+	findLatestByUser(userId: string): Promise<PorfolioSnapshot | null>;
+	findSnapshotsForPerformance(userId: string, startDate?: string): Promise<PorfolioSnapshot[]>;
 	findWithDetails(
 		userId: string,
 		snapshotId: string,
