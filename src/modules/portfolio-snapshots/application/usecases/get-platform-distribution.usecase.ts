@@ -4,10 +4,12 @@ import { AssetEntity } from "@modules/assets/domain/asset.entity";
 import { AssetType } from "@modules/assets/domain/asset.types";
 import {
 	getProviderSymbolForAsset,
+	getBinanceSymbolForAsset,
 	normalizeTwelveDataQuoteResponse,
 	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
+import { BinanceProvider } from "@modules/asset-prices/infrastructure/providers/binance.provider";
 import {
 	AssetPriceProvider,
 	TwelveDataQuoteItem,
@@ -52,6 +54,8 @@ const getQuoteItem = (data: Record<string, TwelveDataQuoteItem> | null, symbol: 
 export class GetPlatformDistributionUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
+	private cryptoPriceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new BinanceProvider();
 
 	constructor(
 		private readonly getHoldingsByAccountUseCase: GetHoldingsByAccountUseCase,
@@ -62,18 +66,30 @@ export class GetPlatformDistributionUseCase {
 		@inject(TOKENS.RedisClient) private readonly redisClient: RedisClient,
 	) {}
 
-	private buildSymbols(assets: AssetEntity[]): string[] {
-		const symbols = new Set<string>();
+	private buildSymbols(assets: AssetEntity[]) {
+		const twelvedataSymbols = new Set<string>();
+		const binanceSymbols = new Set<string>();
 
 		for (const asset of assets) {
+			if (asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin) {
+				const binanceSymbol = getBinanceSymbolForAsset(asset);
+				if (binanceSymbol) {
+					binanceSymbols.add(binanceSymbol);
+				}
+				continue;
+			}
+
 			const providerSymbol = getProviderSymbolForAsset(asset);
 			if (providerSymbol.toUpperCase() === "USD/USD") {
 				continue;
 			}
-			symbols.add(providerSymbol);
+			twelvedataSymbols.add(providerSymbol);
 		}
 
-		return Array.from(symbols);
+		return {
+			twelvedataSymbols: Array.from(twelvedataSymbols),
+			binanceSymbols: Array.from(binanceSymbols),
+		};
 	}
 
 	private normalizeQuoteMap(data: TwelveDataQuoteResponse | null): Record<string, TwelveDataQuoteItem> | null {
@@ -102,7 +118,10 @@ export class GetPlatformDistributionUseCase {
 			return null;
 		}
 
-		const providerSymbol = getProviderSymbolForAsset(asset);
+		const providerSymbol =
+			asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin
+				? getBinanceSymbolForAsset(asset)
+				: getProviderSymbolForAsset(asset);
 		const quoteItem = getQuoteItem(quoteMap, providerSymbol);
 		const close = quoteItem ? toNumber(quoteItem.close) : undefined;
 		if (close && close > 0) {
@@ -199,16 +218,33 @@ export class GetPlatformDistributionUseCase {
 		const assets = await this.assetRepository.findByIdentifiers(assetIds);
 		const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
 
-		const symbols = this.buildSymbols(assets);
-		const quoteResponse = symbols.length
-			? await requestProviderQuotesWithCache(
-					this.priceProvider,
-					assets,
-					this.assetPriceRepository,
-					symbols,
-				)
-			: null;
-		const quoteMap = this.normalizeQuoteMap(quoteResponse);
+		const { twelvedataSymbols, binanceSymbols } = this.buildSymbols(assets);
+		const [twelvedataResponse, binanceResponse] = await Promise.all([
+			twelvedataSymbols.length
+				? requestProviderQuotesWithCache(
+						this.priceProvider,
+						assets,
+						this.assetPriceRepository,
+						twelvedataSymbols,
+					)
+				: Promise.resolve(null),
+			binanceSymbols.length
+				? requestProviderQuotesWithCache(
+						this.cryptoPriceProvider,
+						assets.filter(
+							(asset) => asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin,
+						),
+						this.assetPriceRepository,
+						binanceSymbols,
+						{ symbolResolver: getBinanceSymbolForAsset },
+					)
+				: Promise.resolve(null),
+		]);
+		const mergedMap = {
+			...(this.normalizeQuoteMap(twelvedataResponse) ?? {}),
+			...(this.normalizeQuoteMap(binanceResponse) ?? {}),
+		};
+		const quoteMap = Object.keys(mergedMap).length ? mergedMap : null;
 
 		const priceUsdByAsset = new Map<string, Decimal>();
 		for (const asset of assets) {

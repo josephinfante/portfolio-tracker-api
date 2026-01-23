@@ -5,9 +5,10 @@ import { AssetPriceLiveCacheResponse, AssetPriceLiveCache } from "@modules/asset
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
 	buildLivePriceCaches,
+	getBinanceSymbolForAsset,
 	getProviderSymbolForAsset,
 	normalizeTwelveDataQuoteResponse,
-	requestProviderQuotes,
+	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { AssetPriceLiveCacheStore } from "@modules/asset-prices/infrastructure/cache/asset-price-live.cache";
 import { TOKENS } from "@shared/container/tokens";
@@ -19,6 +20,8 @@ import {
 	AssetPriceProvider,
 	TwelveDataQuoteResponse,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
+import { BinanceProvider } from "@modules/asset-prices/infrastructure/providers/binance.provider";
 
 const allowedTypes = new Set([AssetType.crypto, AssetType.stablecoin, AssetType.fiat, AssetType.stock, AssetType.etf]);
 
@@ -29,10 +32,13 @@ const normalizeIdentifiers = (assets: string[]) =>
 export class GetAssetLivePriceUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
+	private cryptoPriceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new BinanceProvider();
 	private cacheStore: AssetPriceLiveCacheStore;
 
 	constructor(
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private assetPriceRepository: AssetPriceRepository,
 		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {
 		this.cacheStore = new AssetPriceLiveCacheStore(this.redisClient);
@@ -80,14 +86,48 @@ export class GetAssetLivePriceUseCase {
 
 		this.validateAssets(found);
 
-		const symbols = found.map((asset) => getProviderSymbolForAsset(asset));
-		const data = await requestProviderQuotes(this.priceProvider, symbols);
-		const normalized = normalizeTwelveDataQuoteResponse(data);
-		if (!normalized) {
+		const cryptoAssets = found.filter(
+			(asset) => asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin,
+		);
+		const otherAssets = found.filter(
+			(asset) => asset.asset_type !== AssetType.crypto && asset.asset_type !== AssetType.stablecoin,
+		);
+
+		const twelvedataSymbols = otherAssets.map((asset) => getProviderSymbolForAsset(asset));
+		const binanceSymbols = cryptoAssets.map((asset) => getBinanceSymbolForAsset(asset)).filter((symbol) => symbol);
+
+		const [twelvedataResponse, binanceResponse] = await Promise.all([
+			twelvedataSymbols.length
+				? requestProviderQuotesWithCache(
+						this.priceProvider,
+						otherAssets,
+						this.assetPriceRepository,
+						twelvedataSymbols,
+					)
+				: Promise.resolve(null),
+			binanceSymbols.length
+				? requestProviderQuotesWithCache(
+						this.cryptoPriceProvider,
+						cryptoAssets,
+						this.assetPriceRepository,
+						binanceSymbols,
+						{ symbolResolver: getBinanceSymbolForAsset },
+					)
+				: Promise.resolve(null),
+		]);
+
+		const twelvedataNormalized = normalizeTwelveDataQuoteResponse(twelvedataResponse);
+		const binanceNormalized = normalizeTwelveDataQuoteResponse(binanceResponse);
+		if (!twelvedataNormalized && !binanceNormalized) {
 			return { items: [], totalCount: 0 };
 		}
 
-		const caches = buildLivePriceCaches(this.priceProvider, found, normalized);
+		const caches = [
+			...buildLivePriceCaches(this.priceProvider, otherAssets, twelvedataNormalized),
+			...buildLivePriceCaches(this.cryptoPriceProvider, cryptoAssets, binanceNormalized, {
+				symbolResolver: getBinanceSymbolForAsset,
+			}),
+		];
 		if (caches.length) {
 			await this.cacheStore.setMany(caches);
 		}

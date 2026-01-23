@@ -63,5 +63,5 @@ export interface AssetPriceProviderResponseMap {
 export interface AssetPriceProvider<TMap extends AssetPriceProviderResponseMap> {
 	name: string;
 	getQuote(assetsSymbol: string[]): Promise<TMap["quote"] | null>;
-	getHistorical(assetSymbol: string, startAt: number, endAt: number): Promise<TMap["historical"] | null>;
+	getHistorical?(assetSymbol: string, startAt: number, endAt: number): Promise<TMap["historical"] | null>;
 }

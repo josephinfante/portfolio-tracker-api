@@ -82,6 +82,20 @@ export const getProviderSymbolForAsset = (asset: AssetEntity): string => {
 	return asset.symbol;
 };
 
+export const getBinanceSymbolForAsset = (asset: AssetEntity): string => {
+	if (asset.asset_type !== AssetType.crypto && asset.asset_type !== AssetType.stablecoin) {
+		return "";
+	}
+	const symbol = asset.symbol?.trim().toUpperCase();
+	if (!symbol) {
+		return "";
+	}
+	if (asset.asset_type === AssetType.stablecoin) {
+		return `${symbol}USD`;
+	}
+	return `${symbol}USDT`;
+};
+
 const inferQuoteCurrency = (asset: AssetEntity): string | undefined => {
 	if (asset.asset_type === AssetType.fiat) {
 		const symbol = asset.symbol?.trim().toUpperCase();
@@ -140,6 +154,7 @@ export async function requestProviderQuotesWithCache(
 	options?: {
 		maxAgeMs?: number;
 		persist?: boolean;
+		symbolResolver?: (asset: AssetEntity) => string;
 	},
 ): Promise<TwelveDataQuoteResponse | null> {
 	if (!symbols.length) {
@@ -155,6 +170,7 @@ export async function requestProviderQuotesWithCache(
 
 	const now = Date.now();
 	const cutoff = now - maxAgeMs;
+	const symbolResolver = options?.symbolResolver ?? getProviderSymbolForAsset;
 
 	const assetMap = new Map<string, AssetEntity>();
 	const assetIds: string[] = [];
@@ -163,7 +179,10 @@ export async function requestProviderQuotesWithCache(
 
 	for (const asset of assets) {
 		assetIds.push(asset.id);
-		assetMap.set(normalizeSymbol(getProviderSymbolForAsset(asset)), asset);
+		const symbol = symbolResolver(asset);
+		if (symbol) {
+			assetMap.set(normalizeSymbol(symbol), asset);
+		}
 		const quoteCurrency = inferQuoteCurrency(asset);
 		if (quoteCurrency) {
 			assetQuoteById.set(asset.id, quoteCurrency);
@@ -222,7 +241,7 @@ export async function requestProviderQuotesWithCache(
 		const normalized = normalizeTwelveDataQuoteResponse(providerData);
 		if (normalized) {
 			providerMap = normalized;
-			const inputs = buildPriceInputs(provider, assets, normalized);
+			const inputs = buildPriceInputs(provider, assets, normalized, { symbolResolver });
 			if (persist && inputs.length) {
 				await assetPriceRepository.upsertMany(inputs);
 			}
@@ -237,14 +256,23 @@ export function buildLivePriceCaches(
 	provider: QuoteProvider,
 	assets: AssetEntity[],
 	data: TwelveDataQuoteResponse | null,
+	options?: {
+		symbolResolver?: (asset: AssetEntity) => string;
+	},
 ): AssetPriceLiveCache[] {
 	const normalized = normalizeTwelveDataQuoteResponse(data);
 	if (!normalized) {
 		return [];
 	}
 
+	const symbolResolver = options?.symbolResolver ?? getProviderSymbolForAsset;
 	const assetMap = new Map(
-		assets.map((asset) => [normalizeSymbol(getProviderSymbolForAsset(asset)), asset]),
+		assets
+			.map((asset) => {
+				const symbol = symbolResolver(asset);
+				return symbol ? [normalizeSymbol(symbol), asset] : null;
+			})
+			.filter((entry): entry is [string, AssetEntity] => !!entry),
 	);
 
 	return Object.entries(normalized).reduce<AssetPriceLiveCache[]>((acc, [key, item]) => {
@@ -305,14 +333,23 @@ export function buildPriceInputs(
 	provider: QuoteProvider,
 	assets: AssetEntity[],
 	data: TwelveDataQuoteResponse | null,
+	options?: {
+		symbolResolver?: (asset: AssetEntity) => string;
+	},
 ): CreateAssetPriceInput[] {
 	const normalized = normalizeTwelveDataQuoteResponse(data);
 	if (!normalized) {
 		return [];
 	}
 
+	const symbolResolver = options?.symbolResolver ?? getProviderSymbolForAsset;
 	const assetMap = new Map(
-		assets.map((asset) => [normalizeSymbol(getProviderSymbolForAsset(asset)), asset]),
+		assets
+			.map((asset) => {
+				const symbol = symbolResolver(asset);
+				return symbol ? [normalizeSymbol(symbol), asset] : null;
+			})
+			.filter((entry): entry is [string, AssetEntity] => !!entry),
 	);
 	const now = Date.now();
 	return Object.entries(normalized).reduce<CreateAssetPriceInput[]>((acc, [key, item]) => {

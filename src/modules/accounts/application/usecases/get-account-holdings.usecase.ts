@@ -7,7 +7,9 @@ import {
 	requestProviderQuotesWithCache,
 	normalizeTwelveDataQuoteResponse,
 	getProviderSymbolForAsset,
+	getBinanceSymbolForAsset,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
+import { BinanceProvider } from "@modules/asset-prices/infrastructure/providers/binance.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
 	AssetPriceProvider,
@@ -109,6 +111,8 @@ const mapAssetType = (assetType: AssetType): "fiat" | "crypto" | "stock" | "etf"
 export class GetAccountHoldingsUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
+	private cryptoPriceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new BinanceProvider();
 
 	constructor(
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
@@ -119,8 +123,9 @@ export class GetAccountHoldingsUseCase {
 		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
 
-	private buildSymbols(assets: AssetEntity[], quoteCurrency: string): string[] {
-		const symbols = new Set<string>();
+	private buildSymbols(assets: AssetEntity[], quoteCurrency: string) {
+		const twelvedataSymbols = new Set<string>();
+		const binanceSymbols = new Set<string>();
 		const normalizedQuote = quoteCurrency.toUpperCase();
 
 		for (const asset of assets) {
@@ -128,17 +133,28 @@ export class GetAccountHoldingsUseCase {
 			if (!symbol) {
 				continue;
 			}
+			if (asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin) {
+				const binanceSymbol = getBinanceSymbolForAsset(asset);
+				if (binanceSymbol) {
+					binanceSymbols.add(binanceSymbol);
+				}
+				continue;
+			}
+
 			const providerSymbol = getProviderSymbolForAsset(asset);
 			if (providerSymbol.toUpperCase() !== "USD/USD") {
-				symbols.add(providerSymbol);
+				twelvedataSymbols.add(providerSymbol);
 			}
 		}
 
 		if (normalizedQuote !== "USD") {
-			symbols.add(`USD/${normalizedQuote}`);
+			twelvedataSymbols.add(`USD/${normalizedQuote}`);
 		}
 
-		return Array.from(symbols);
+		return {
+			twelvedataSymbols: Array.from(twelvedataSymbols),
+			binanceSymbols: Array.from(binanceSymbols),
+		};
 	}
 
 	private normalizeQuoteMap(data: TwelveDataQuoteResponse | null): Record<string, TwelveDataQuoteItem> | null {
@@ -244,14 +260,32 @@ export class GetAccountHoldingsUseCase {
 		}
 		const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
 
-		const symbols = this.buildSymbols(assets, normalizedQuote);
-		const quoteResponse = await requestProviderQuotesWithCache(
-			this.priceProvider,
-			assets,
-			this.assetPriceRepository,
-			symbols,
-		);
-		const quoteMap = this.normalizeQuoteMap(quoteResponse);
+		const { twelvedataSymbols, binanceSymbols } = this.buildSymbols(assets, normalizedQuote);
+		const [twelvedataResponse, binanceResponse] = await Promise.all([
+			twelvedataSymbols.length
+				? requestProviderQuotesWithCache(
+						this.priceProvider,
+						assets,
+						this.assetPriceRepository,
+						twelvedataSymbols,
+					)
+				: Promise.resolve(null),
+			binanceSymbols.length
+				? requestProviderQuotesWithCache(
+						this.cryptoPriceProvider,
+						assets.filter(
+							(asset) => asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin,
+						),
+						this.assetPriceRepository,
+						binanceSymbols,
+						{ symbolResolver: getBinanceSymbolForAsset },
+					)
+				: Promise.resolve(null),
+		]);
+		const quoteMap = this.normalizeQuoteMap({
+			...(this.normalizeQuoteMap(twelvedataResponse) ?? {}),
+			...(this.normalizeQuoteMap(binanceResponse) ?? {}),
+		});
 
 		let effectiveQuote = normalizedQuote;
 		let fxUsdToQuote = 1;
@@ -311,7 +345,10 @@ export class GetAccountHoldingsUseCase {
 					}
 				}
 			} else {
-				const providerSymbol = getProviderSymbolForAsset(asset);
+				const providerSymbol =
+					asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin
+						? getBinanceSymbolForAsset(asset)
+						: getProviderSymbolForAsset(asset);
 				const quoteItem = getQuoteItem(quoteMap, providerSymbol);
 				const close = quoteItem ? toNumber(quoteItem.close) : undefined;
 				const quoteAt = toTimestamp(quoteItem?.timestamp) ?? toTimestamp(quoteItem?.datetime) ?? now;

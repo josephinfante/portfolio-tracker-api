@@ -161,6 +161,9 @@ export class GetAssetPriceRangeUseCase {
 
 		if (!existingPrices.length || missingDays.length) {
 			const symbol = getProviderSymbolForAsset(asset);
+			if (!this.priceProvider.getHistorical) {
+				throw new ValidationError("Historical prices are not supported by this provider", "assetType");
+			}
 			const historical = await this.priceProvider.getHistorical(symbol, range.start, range.end);
 			if (historical?.values?.length) {
 				const quoteCurrency = "USD";
