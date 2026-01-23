@@ -105,14 +105,15 @@ export class ExchangeAssetUseCase {
 			{
 				accountId: data.fromAccountId,
 				assetId: data.fromAssetId,
-				delta: D(data.fromQuantity).neg().toNumber(),
+				delta: Number(D(data.fromQuantity).neg().toFixed(8)),
 			},
 		];
+
 		if (data.fee) {
 			deltas.push({
 				accountId: data.fromAccountId,
 				assetId: data.fee.assetId,
-				delta: D(data.fee.amount).neg().toNumber(),
+				delta: Number(D(data.fee.amount).neg().toFixed(8)),
 			});
 		}
 		await this.balanceGuard.ensure(userId, deltas);
@@ -141,22 +142,22 @@ export class ExchangeAssetUseCase {
 				tx,
 			);
 
-				if (data.fee && feeAsset) {
-					await this.transactionRepository.create(
-						{
-							userId,
-							accountId: data.fromAccountId,
-							assetId: data.fee.assetId,
+			if (data.fee && feeAsset) {
+				await this.transactionRepository.create(
+					{
+						userId,
+						accountId: data.fromAccountId,
+						assetId: data.fee.assetId,
 						transactionType: TransactionType.FEE,
-							correctionType: null,
-							referenceTxId: sellTx.id,
-							quantity: toFixed(D(data.fee.amount).neg()),
-							totalAmount: toFixed(D(data.fee.amount)),
-							paymentAssetId: data.fee.assetId,
-							paymentQuantity: toFixed(D(data.fee.amount)),
-							exchangeRate: null,
-							transactionDate,
-							notes: `Fee for exchange ${sellTx.id}`,
+						correctionType: null,
+						referenceTxId: sellTx.id,
+						quantity: toFixed(D(data.fee.amount).neg()),
+						totalAmount: toFixed(D(data.fee.amount)),
+						paymentAssetId: data.fee.assetId,
+						paymentQuantity: toFixed(D(data.fee.amount)),
+						exchangeRate: null,
+						transactionDate,
+						notes: `Fee for exchange ${sellTx.id}`,
 					},
 					tx,
 				);

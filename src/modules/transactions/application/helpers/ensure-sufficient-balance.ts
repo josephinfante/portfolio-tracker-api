@@ -10,20 +10,29 @@ export function ensureSufficientBalance(input: { holdings: Holding[]; deltas: Ba
 	}
 
 	const balances = new Map<string, Decimal>();
+	const grouped = new Map<string, Decimal>();
+
 	for (const holding of input.holdings) {
 		const key = `${holding.accountId}:${holding.assetId}`;
-		balances.set(key, D(holding.quantity));
+		balances.set(key, D(holding.quantity).toDecimalPlaces(8));
 	}
 
 	for (const delta of input.deltas) {
-		const deltaValue = D(delta.delta);
-		if (!deltaValue.lt(0)) {
+		const key = `${delta.accountId}:${delta.assetId}`;
+		const current = grouped.get(key) ?? D(0);
+
+		const value = D(delta.delta).toDecimalPlaces(8);
+
+		grouped.set(key, current.plus(value));
+	}
+
+	for (const [key, totalDelta] of grouped.entries()) {
+		if (!totalDelta.lt(0)) {
 			continue;
 		}
 
-		const key = `${delta.accountId}:${delta.assetId}`;
 		const current = balances.get(key) ?? D(0);
-		const next = current.plus(deltaValue);
+		const next = current.plus(totalDelta);
 
 		if (next.lt(0)) {
 			throw new ValidationError("Insufficient funds", "balance");
