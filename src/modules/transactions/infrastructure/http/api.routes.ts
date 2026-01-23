@@ -13,6 +13,7 @@ export function createTransactionApiRoutes() {
 	router.post("/list", controller.list);
 	router.get("/:id", controller.findById);
 	router.patch("/:id", controller.adjust);
+	router.patch("/:id/transaction-date", controller.updateTransactionDate);
 	router.post("/:id/reverse", controller.reverse);
 	router.post("/transfer", controller.transfer);
 	router.post("/exchange", controller.exchange);

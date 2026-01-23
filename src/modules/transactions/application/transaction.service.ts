@@ -9,6 +9,7 @@ import { TransferAssetUseCase } from "./usecases/transfer-asset.usecase";
 import { ExchangeAssetUseCase } from "./usecases/exchange-asset.usecase";
 import { MoveAssetUseCase } from "./usecases/move-asset.usecase";
 import { GetHoldingsByAccountUseCase } from "./usecases/get-holdings-by-account.usecase";
+import { UpdateTransactionDateUseCase } from "./usecases/update-transaction-date.usecase";
 import { TransactionEntity } from "../domain/transaction.entity";
 import { Holding, TransactionListFilters } from "../domain/transaction.types";
 import { PaginatedResponse } from "@shared/types/paginated-response";
@@ -22,6 +23,7 @@ export class TransactionService {
 		private getTransactionDetailsUseCase: GetTransactionDetailsUseCase,
 		private adjustTransactionUseCase: AdjustTransactionUseCase,
 		private reverseTransactionUseCase: ReverseTransactionUseCase,
+		private updateTransactionDateUseCase: UpdateTransactionDateUseCase,
 		private transferAssetUseCase: TransferAssetUseCase,
 		private exchangeAssetUseCase: ExchangeAssetUseCase,
 		private moveAssetUseCase: MoveAssetUseCase,
@@ -53,6 +55,10 @@ export class TransactionService {
 
 	async reverseTransaction(id: string, userId: string, input: unknown): Promise<TransactionEntity> {
 		return await this.reverseTransactionUseCase.execute(id, userId, input);
+	}
+
+	async updateTransactionDate(id: string, userId: string, input: unknown): Promise<TransactionEntity> {
+		return await this.updateTransactionDateUseCase.execute(id, userId, input);
 	}
 
 	async transferAsset(userId: string, input: unknown): Promise<TransactionEntity> {
