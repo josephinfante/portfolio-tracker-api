@@ -21,4 +21,14 @@ export interface TransactionRepository {
 		db?: Drizzle | NodePgTransaction<any, any>,
 	): Promise<TransactionEntity>;
 	adjust(id: string, newData: Partial<CreateTransactionInput>, reason: string | null): Promise<TransactionEntity>;
+	updateTransactionDate(
+		id: string,
+		transactionDate: number,
+		db?: Drizzle | NodePgTransaction<any, any>,
+	): Promise<TransactionEntity>;
+	updateFeeTransactionDatesByReference(
+		referenceTxId: string,
+		transactionDate: number,
+		db?: Drizzle | NodePgTransaction<any, any>,
+	): Promise<void>;
 }

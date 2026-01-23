@@ -418,4 +418,40 @@ export class TransactionSqlRepository implements TransactionRepository {
 
 		return TransactionMapper.toEntity(created);
 	}
+
+	async updateTransactionDate(
+		id: string,
+		transactionDate: number,
+		dbOverride?: Drizzle | NodePgTransaction<any, any>,
+	): Promise<TransactionEntity> {
+		const db = dbOverride ?? this.db;
+		const [row] = await db
+			.update(transactionsTable)
+			.set({ transactionDate })
+			.where(eq(transactionsTable.id, id))
+			.returning();
+
+		if (!row) {
+			throw new NotFoundError(`Transaction ${id} not found`);
+		}
+
+		return TransactionMapper.toEntity(row);
+	}
+
+	async updateFeeTransactionDatesByReference(
+		referenceTxId: string,
+		transactionDate: number,
+		dbOverride?: Drizzle | NodePgTransaction<any, any>,
+	): Promise<void> {
+		const db = dbOverride ?? this.db;
+		await db
+			.update(transactionsTable)
+			.set({ transactionDate })
+			.where(
+				and(
+					eq(transactionsTable.referenceTxId, referenceTxId),
+					eq(transactionsTable.transactionType, TransactionType.FEE),
+				),
+			);
+	}
 }

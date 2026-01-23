@@ -40,6 +40,13 @@ export class TransactionController {
 		return res.status(200).success(response);
 	});
 
+	updateTransactionDate = asyncHandler(async (req: Request, res: Response) => {
+		const userId = res.locals.user.id;
+		const id = req.params.id as string;
+		const response = await this.transactionService.updateTransactionDate(id, userId, req.body);
+		return res.status(200).success(response);
+	});
+
 	transfer = asyncHandler(async (req: Request, res: Response) => {
 		const userId = res.locals.user.id;
 		const response = await this.transactionService.transferAsset(userId, req.body);
