@@ -1,16 +1,18 @@
+import { AssetRepository } from "@modules/assets/domain/asset.repository";
 import { UserRepository } from "@modules/users/domain/user.repository";
 import { TOKENS } from "@shared/container/tokens";
 import { NotFoundError } from "@shared/errors/domain/not-found.error";
 import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
 import { FxRate } from "@modules/exchange-rates/domain/exchange-rate.types";
-import { requestProviderQuotes } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
+import { requestProviderQuotesWithCache } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
 	AssetPriceProvider,
 	TwelveDataQuoteResponse,
 	TwelveDataQuoteItem,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 
 const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
 
@@ -61,7 +63,11 @@ export class GetFxUsdToBaseUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
 
-	constructor(@inject(TOKENS.UserRepository) private userRepository: UserRepository) {}
+	constructor(
+		@inject(TOKENS.UserRepository) private userRepository: UserRepository,
+		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private assetPriceRepository: AssetPriceRepository,
+	) {}
 
 	async execute(userId: string): Promise<FxRate> {
 		if (!userId || typeof userId !== "string") {
@@ -83,7 +89,11 @@ export class GetFxUsdToBaseUseCase {
 		}
 
 		const symbol = `USD/${baseCurrency}`;
-		const data = await requestProviderQuotes(this.priceProvider, [symbol]);
+		const assets = await this.assetRepository.findByIdentifiers([baseCurrency]);
+		const fxAsset = assets.find((asset) => asset.symbol.toUpperCase() === baseCurrency) ?? assets[0];
+		const data = fxAsset
+			? await requestProviderQuotesWithCache(this.priceProvider, [fxAsset], this.assetPriceRepository, [symbol])
+			: await this.priceProvider.getQuote([symbol]);
 		const quoteItem = getQuoteItem(data, symbol);
 		const close = quoteItem ? toNumber(quoteItem.close) : undefined;
 

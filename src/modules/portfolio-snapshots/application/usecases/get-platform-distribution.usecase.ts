@@ -5,7 +5,7 @@ import { AssetType } from "@modules/assets/domain/asset.types";
 import {
 	getProviderSymbolForAsset,
 	normalizeTwelveDataQuoteResponse,
-	requestProviderQuotes,
+	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
@@ -13,6 +13,7 @@ import {
 	TwelveDataQuoteItem,
 	TwelveDataQuoteResponse,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 import { ExchangeRateService } from "@modules/exchange-rates/application/exchange-rate.service";
 import { PlatformDistributionDto } from "@modules/portfolio-snapshots/domain/platform-distribution.types";
 import { GetHoldingsByAccountUseCase } from "@modules/transactions/application/usecases/get-holdings-by-account.usecase";
@@ -56,6 +57,7 @@ export class GetPlatformDistributionUseCase {
 		private readonly getHoldingsByAccountUseCase: GetHoldingsByAccountUseCase,
 		@inject(TOKENS.AccountRepository) private readonly accountRepository: AccountRepository,
 		@inject(TOKENS.AssetRepository) private readonly assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private readonly assetPriceRepository: AssetPriceRepository,
 		private readonly exchangeRateService: ExchangeRateService,
 		@inject(TOKENS.RedisClient) private readonly redisClient: RedisClient,
 	) {}
@@ -198,7 +200,14 @@ export class GetPlatformDistributionUseCase {
 		const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
 
 		const symbols = this.buildSymbols(assets);
-		const quoteResponse = symbols.length ? await requestProviderQuotes(this.priceProvider, symbols) : null;
+		const quoteResponse = symbols.length
+			? await requestProviderQuotesWithCache(
+					this.priceProvider,
+					assets,
+					this.assetPriceRepository,
+					symbols,
+				)
+			: null;
 		const quoteMap = this.normalizeQuoteMap(quoteResponse);
 
 		const priceUsdByAsset = new Map<string, Decimal>();

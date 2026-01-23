@@ -6,12 +6,13 @@ import {
 	buildPriceInputs,
 	getProviderSymbolForAsset,
 	normalizeTwelveDataQuoteResponse,
-	requestProviderQuotes,
+	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import {
 	AssetPriceProvider,
 	TwelveDataQuoteResponse,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 import { TOKENS } from "@shared/container/tokens";
 import { logger } from "@shared/logger";
 import { inject, injectable } from "tsyringe";
@@ -21,7 +22,10 @@ export class SyncAssetPricesUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
 
-	constructor(@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository) {}
+	constructor(
+		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private assetPriceRepository: AssetPriceRepository,
+	) {}
 
 	async execute(): Promise<CreateAssetPriceInput[]> {
 		const { items } = await this.assetRepository.findAll();
@@ -43,7 +47,13 @@ export class SyncAssetPricesUseCase {
 		const symbols = allowedAssets.map((asset) => getProviderSymbolForAsset(asset));
 		if (symbols.length) {
 			try {
-				const data = await requestProviderQuotes(this.priceProvider, symbols);
+				const data = await requestProviderQuotesWithCache(
+					this.priceProvider,
+					allowedAssets,
+					this.assetPriceRepository,
+					symbols,
+					{ persist: false },
+				);
 				const normalized = normalizeTwelveDataQuoteResponse(data);
 				if (normalized) {
 					results.push(...buildPriceInputs(this.priceProvider, allowedAssets, normalized));
