@@ -47,16 +47,18 @@ export class AssetController {
 		}
 
 		const rawLimit = req.query.txLimit;
-		const parsedLimit = typeof rawLimit === "string" ? Number(rawLimit) : rawLimit;
-		const txLimit =
-			parsedLimit === undefined
-				? DEFAULT_TX_LIMIT
-				: Number.isFinite(parsedLimit) && parsedLimit > 0 && parsedLimit <= MAX_TX_LIMIT
-					? parsedLimit
-					: undefined;
+		let txLimit = DEFAULT_TX_LIMIT;
+		if (rawLimit !== undefined) {
+			if (typeof rawLimit !== "string") {
+				throw new ValidationError("Invalid transaction limit", "txLimit", rawLimit);
+			}
 
-		if (txLimit === undefined) {
-			throw new ValidationError("Invalid transaction limit", "txLimit", rawLimit);
+			const parsedLimit = Number(rawLimit);
+			if (!Number.isFinite(parsedLimit) || parsedLimit <= 0 || parsedLimit > MAX_TX_LIMIT) {
+				throw new ValidationError("Invalid transaction limit", "txLimit", rawLimit);
+			}
+
+			txLimit = parsedLimit;
 		}
 
 		const response = await this.assetService.getAssetDetails(userId, id, { quoteCurrency, txLimit });
