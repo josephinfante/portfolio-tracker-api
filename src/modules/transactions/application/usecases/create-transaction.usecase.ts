@@ -69,7 +69,14 @@ export class CreateTransactionUseCase {
 		}
 
 		const isFiatAsset = asset.asset_type === AssetType.fiat;
-		if (!isFiatAsset && !data.paymentAssetId) {
+		const requiresPaymentAsset =
+			!isFiatAsset &&
+			[
+				TransactionType.BUY,
+				TransactionType.SELL,
+				TransactionType.FOREIGN_EXCHANGE,
+			].includes(data.transactionType as TransactionType);
+		if (requiresPaymentAsset && !data.paymentAssetId) {
 			throw new ValidationError("Payment asset is required", "paymentAssetId");
 		}
 
