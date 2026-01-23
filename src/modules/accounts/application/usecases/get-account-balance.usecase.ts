@@ -9,6 +9,8 @@ import { ValidationError } from "@shared/errors/domain/validation.error";
 import { inject, injectable } from "tsyringe";
 import { AccountBalanceResponse } from "@modules/accounts/domain/account-balance.types";
 import { AssetType } from "@modules/assets/domain/asset.types";
+import Decimal from "decimal.js";
+import { D } from "@shared/helpers/decimal";
 
 const transactionTypeSigns = new Map<TransactionType, number>([
 	[TransactionType.BUY, 1],
@@ -77,18 +79,22 @@ export class GetAccountBalanceUseCase {
 		}
 
 		const { items } = await this.transactionRepository.findByUserId(userId, { limit: 0, offset: 0 });
-		const balances = new Map<string, number>();
+		const balances = new Map<string, Decimal>();
 
 		for (const transaction of items) {
 			if (transaction.accountId !== accountId) {
 				continue;
 			}
-			const normalized = normalizeQuantity(transaction.transactionType, transaction.correctionType, transaction.quantity);
+			const normalized = normalizeQuantity(
+				transaction.transactionType,
+				transaction.correctionType,
+				transaction.quantity,
+			);
 			if (normalized === 0) {
 				continue;
 			}
-			const current = balances.get(transaction.assetId) ?? 0;
-			balances.set(transaction.assetId, current + normalized);
+			const current = balances.get(transaction.assetId) ?? D(0);
+			balances.set(transaction.assetId, current.add(normalized));
 		}
 
 		const assetIds = Array.from(balances.keys());
@@ -98,9 +104,10 @@ export class GetAccountBalanceUseCase {
 		const response = Array.from(balances.entries())
 			.map(([assetId, quantity]) => ({
 				assetId,
-				quantity,
+				quantity: quantity.toNumber(),
 				asset: assetMap.get(assetId) ?? null,
 			}))
+
 			.filter((item) => item.quantity !== 0)
 			.filter((item) => item.asset && totalBalanceAssetTypes.has(item.asset.asset_type))
 			.map((item) => ({
@@ -111,7 +118,7 @@ export class GetAccountBalanceUseCase {
 							id: item.asset.id,
 							symbol: item.asset.symbol,
 							name: item.asset.name,
-					  }
+						}
 					: null,
 			}))
 			.sort((a, b) => a.assetId.localeCompare(b.assetId));
