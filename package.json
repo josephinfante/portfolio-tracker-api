@@ -5,7 +5,7 @@
 	"main": "index.js",
 	"scripts": {
 		"dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
-		"build": "rimraf ./dist && tsc",
+		"build": "rimraf ./dist && tsc && tsc-alias",
 		"start": "node ./dist/main.js",
 		"tsc": "tsc",
 		"lint": "eslint \"src/**/*.{ts,tsx}\""
@@ -48,6 +48,7 @@
 		"eslint": "9.39.2",
 		"prettier": "3.7.4",
 		"ts-node-dev": "2.0.0",
+		"tsc-alias": "^1.8.16",
 		"tsconfig-paths": "4.2.0",
 		"tsx": "4.21.0",
 		"typescript": "5.9.3"
