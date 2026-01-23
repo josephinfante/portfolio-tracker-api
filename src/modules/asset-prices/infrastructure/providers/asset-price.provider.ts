@@ -1,5 +1,6 @@
 import { AssetEntity } from "@modules/assets/domain/asset.entity";
 import { AssetType } from "@modules/assets/domain/asset.types";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 import { AssetPriceLiveCache, CreateAssetPriceInput } from "@modules/asset-prices/domain/asset-price.types";
 import {
 	AssetPriceProvider,
@@ -80,6 +81,157 @@ export const getProviderSymbolForAsset = (asset: AssetEntity): string => {
 	}
 	return asset.symbol;
 };
+
+const inferQuoteCurrency = (asset: AssetEntity): string | undefined => {
+	if (asset.asset_type === AssetType.fiat) {
+		const symbol = asset.symbol?.trim().toUpperCase();
+		return symbol && symbol.length ? symbol : undefined;
+	}
+
+	const quoteCurrency = asset.quote_currency?.trim().toUpperCase();
+	return quoteCurrency && quoteCurrency.length ? quoteCurrency : "USD";
+};
+
+const buildCachedQuoteItem = (
+	symbol: string,
+	asset: AssetEntity,
+	price: { price: number; priceAt: number; quoteCurrency: string },
+): TwelveDataQuoteItem => {
+	const timestamp = price.priceAt;
+	const priceValue = price.price.toString();
+	const datetime = new Date(timestamp).toISOString();
+
+	return {
+		symbol,
+		name: asset.name ?? asset.symbol,
+		exchange: "",
+		mic_code: "",
+		currency: price.quoteCurrency,
+		datetime,
+		timestamp,
+		last_quote_at: timestamp,
+		open: priceValue,
+		high: priceValue,
+		low: priceValue,
+		close: priceValue,
+		volume: "0",
+		previous_close: priceValue,
+		change: "0",
+		percent_change: "0",
+		average_volume: "0",
+		is_market_open: false,
+		fifty_two_week: {
+			low: "0",
+			high: "0",
+			low_change: "0",
+			high_change: "0",
+			low_change_percent: "0",
+			high_change_percent: "0",
+			range: "0",
+		},
+	};
+};
+
+export async function requestProviderQuotesWithCache(
+	provider: QuoteProvider,
+	assets: AssetEntity[],
+	assetPriceRepository: AssetPriceRepository,
+	symbols: string[],
+	options?: {
+		maxAgeMs?: number;
+		persist?: boolean;
+	},
+): Promise<TwelveDataQuoteResponse | null> {
+	if (!symbols.length) {
+		return null;
+	}
+
+	if (!assets.length) {
+		return provider.getQuote(symbols);
+	}
+
+	const maxAgeMs = options?.maxAgeMs ?? 30 * 60 * 1000;
+	const persist = options?.persist ?? true;
+
+	const now = Date.now();
+	const cutoff = now - maxAgeMs;
+
+	const assetMap = new Map<string, AssetEntity>();
+	const assetIds: string[] = [];
+	const quoteCurrencies = new Set<string>();
+	const assetQuoteById = new Map<string, string>();
+
+	for (const asset of assets) {
+		assetIds.push(asset.id);
+		assetMap.set(normalizeSymbol(getProviderSymbolForAsset(asset)), asset);
+		const quoteCurrency = inferQuoteCurrency(asset);
+		if (quoteCurrency) {
+			assetQuoteById.set(asset.id, quoteCurrency);
+			quoteCurrencies.add(quoteCurrency);
+		}
+	}
+
+	let cachedQuoteMap: Record<string, TwelveDataQuoteItem> = {};
+	if (assetIds.length && quoteCurrencies.size) {
+		const cached = await assetPriceRepository.findAll({
+			assets: assetIds,
+			quoteCurrencies: Array.from(quoteCurrencies),
+			startAt: cutoff,
+		});
+
+		const latestByKey = new Map<string, { price: number; priceAt: number; quoteCurrency: string }>();
+		for (const item of cached.items) {
+			const priceEntry = item.prices[0];
+			if (!priceEntry) {
+				continue;
+			}
+			const key = `${item.asset.id}:${item.quoteCurrency}`;
+			const existing = latestByKey.get(key);
+			if (!existing || priceEntry.priceAt > existing.priceAt) {
+				latestByKey.set(key, {
+					price: priceEntry.price,
+					priceAt: priceEntry.priceAt,
+					quoteCurrency: item.quoteCurrency,
+				});
+			}
+		}
+
+		cachedQuoteMap = symbols.reduce<Record<string, TwelveDataQuoteItem>>((acc, symbol) => {
+			const asset = assetMap.get(normalizeSymbol(symbol));
+			if (!asset) {
+				return acc;
+			}
+			const quoteCurrency = assetQuoteById.get(asset.id);
+			if (!quoteCurrency) {
+				return acc;
+			}
+			const cachedEntry = latestByKey.get(`${asset.id}:${quoteCurrency}`);
+			if (!cachedEntry) {
+				return acc;
+			}
+			acc[symbol] = buildCachedQuoteItem(symbol, asset, cachedEntry);
+			return acc;
+		}, {});
+	}
+
+	const missingSymbols = symbols.filter((symbol) => !cachedQuoteMap[symbol]);
+
+	let providerMap: Record<string, TwelveDataQuoteItem> = {};
+	if (missingSymbols.length) {
+		const providerData = await provider.getQuote(missingSymbols);
+		const normalized = normalizeTwelveDataQuoteResponse(providerData);
+		if (normalized) {
+			providerMap = normalized;
+			const inputs = buildPriceInputs(provider, assets, normalized);
+			if (persist && inputs.length) {
+				await assetPriceRepository.upsertMany(inputs);
+			}
+		}
+	}
+
+	const merged = { ...providerMap, ...cachedQuoteMap };
+	return Object.keys(merged).length ? merged : null;
+}
 
 export function buildLivePriceCaches(
 	provider: QuoteProvider,

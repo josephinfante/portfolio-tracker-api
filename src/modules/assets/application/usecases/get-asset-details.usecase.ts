@@ -1,9 +1,10 @@
 import { FindAssetUseCase } from "@modules/assets/application/usecases/find-asset.usecase";
 import { AssetEntity } from "@modules/assets/domain/asset.entity";
+import { AssetRepository } from "@modules/assets/domain/asset.repository";
 import { GetAssetLivePriceUseCase } from "@modules/asset-prices/application/usecases/get-asset-live-price.usecase";
 import {
 	normalizeTwelveDataQuoteResponse,
-	requestProviderQuotes,
+	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
@@ -11,12 +12,14 @@ import {
 	TwelveDataQuoteItem,
 	TwelveDataQuoteResponse,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 import { ListAccountsUseCase } from "@modules/accounts/application/usecases/list-accounts.usecase";
 import { GetAccountHoldingsUseCase } from "@modules/accounts/application/usecases/get-account-holdings.usecase";
 import { ListTransactionsUseCase } from "@modules/transactions/application/usecases/list-transactions.usecase";
 import { AssetDetailsResponse } from "../dtos/asset-details.response";
 import { D } from "@shared/helpers/decimal";
-import { injectable } from "tsyringe";
+import { TOKENS } from "@shared/container/tokens";
+import { inject, injectable } from "tsyringe";
 
 type AssetDetailsOptions = {
 	quoteCurrency?: string;
@@ -54,6 +57,8 @@ export class GetAssetDetailsUseCase {
 		private readonly listAccountsUseCase: ListAccountsUseCase,
 		private readonly getAccountHoldingsUseCase: GetAccountHoldingsUseCase,
 		private readonly listTransactionsUseCase: ListTransactionsUseCase,
+		@inject(TOKENS.AssetRepository) private readonly assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private readonly assetPriceRepository: AssetPriceRepository,
 	) {}
 
 	private convertUsdToQuote(value: number | null | undefined, fx: number): number | null {
@@ -74,7 +79,11 @@ export class GetAssetDetailsUseCase {
 
 		try {
 			const fxSymbol = `USD/${normalized}`;
-			const data = await requestProviderQuotes(this.priceProvider, [fxSymbol]);
+			const assets = await this.assetRepository.findByIdentifiers([normalized]);
+			const fxAsset = assets.find((asset) => asset.symbol.toUpperCase() === normalized) ?? assets[0];
+			const data = fxAsset
+				? await requestProviderQuotesWithCache(this.priceProvider, [fxAsset], this.assetPriceRepository, [fxSymbol])
+				: await this.priceProvider.getQuote([fxSymbol]);
 			const quoteMap = normalizeTwelveDataQuoteResponse(data);
 			const fxItem = getQuoteItem(quoteMap, fxSymbol);
 			const fxClose = fxItem ? toNumber(fxItem.close) : undefined;

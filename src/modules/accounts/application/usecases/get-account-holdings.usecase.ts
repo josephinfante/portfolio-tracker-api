@@ -4,7 +4,7 @@ import { AssetRepository } from "@modules/assets/domain/asset.repository";
 import { AssetEntity } from "@modules/assets/domain/asset.entity";
 import { AssetType } from "@modules/assets/domain/asset.types";
 import {
-	requestProviderQuotes,
+	requestProviderQuotesWithCache,
 	normalizeTwelveDataQuoteResponse,
 	getProviderSymbolForAsset,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
@@ -14,6 +14,7 @@ import {
 	TwelveDataQuoteItem,
 	TwelveDataQuoteResponse,
 } from "@modules/asset-prices/infrastructure/providers/price-provider.interface";
+import { AssetPriceRepository } from "@modules/asset-prices/domain/asset-price.repository";
 import { TransactionRepository } from "@modules/transactions/domain/transaction.repository";
 import { TransactionCorrectionType, TransactionType } from "@modules/transactions/domain/transaction.types";
 import { UserRepository } from "@modules/users/domain/user.repository";
@@ -113,6 +114,7 @@ export class GetAccountHoldingsUseCase {
 		@inject(TOKENS.AccountRepository) private accountRepository: AccountRepository,
 		@inject(TOKENS.TransactionRepository) private transactionRepository: TransactionRepository,
 		@inject(TOKENS.AssetRepository) private assetRepository: AssetRepository,
+		@inject(TOKENS.AssetPriceRepository) private assetPriceRepository: AssetPriceRepository,
 		@inject(TOKENS.UserRepository) private userRepository: UserRepository,
 		@inject(TOKENS.RedisClient) private redisClient: RedisClient,
 	) {}
@@ -232,10 +234,23 @@ export class GetAccountHoldingsUseCase {
 
 		const assetIds = holdings.map((holding) => holding.assetId);
 		const assets = await this.assetRepository.findByIdentifiers(assetIds);
+		if (normalizedQuote !== "USD") {
+			const quoteAssets = await this.assetRepository.findByIdentifiers([normalizedQuote]);
+			for (const asset of quoteAssets) {
+				if (!assets.find((item) => item.id === asset.id)) {
+					assets.push(asset);
+				}
+			}
+		}
 		const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
 
 		const symbols = this.buildSymbols(assets, normalizedQuote);
-		const quoteResponse = await requestProviderQuotes(this.priceProvider, symbols);
+		const quoteResponse = await requestProviderQuotesWithCache(
+			this.priceProvider,
+			assets,
+			this.assetPriceRepository,
+			symbols,
+		);
 		const quoteMap = this.normalizeQuoteMap(quoteResponse);
 
 		let effectiveQuote = normalizedQuote;
