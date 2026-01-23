@@ -1,11 +1,15 @@
 import { FindAssetUseCase } from "@modules/assets/application/usecases/find-asset.usecase";
 import { AssetEntity } from "@modules/assets/domain/asset.entity";
 import { AssetRepository } from "@modules/assets/domain/asset.repository";
+import { AssetType } from "@modules/assets/domain/asset.types";
 import { GetAssetLivePriceUseCase } from "@modules/asset-prices/application/usecases/get-asset-live-price.usecase";
 import {
+	buildLivePriceCaches,
+	getBinanceSymbolForAsset,
 	normalizeTwelveDataQuoteResponse,
 	requestProviderQuotesWithCache,
 } from "@modules/asset-prices/infrastructure/providers/asset-price.provider";
+import { BinanceProvider } from "@modules/asset-prices/infrastructure/providers/binance.provider";
 import { TwelvedataProvider } from "@modules/asset-prices/infrastructure/providers/twelvedata.provider";
 import {
 	AssetPriceProvider,
@@ -50,6 +54,8 @@ const getQuoteItem = (data: Record<string, TwelveDataQuoteItem> | null, symbol: 
 export class GetAssetDetailsUseCase {
 	private priceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
 		new TwelvedataProvider();
+	private cryptoPriceProvider: AssetPriceProvider<{ quote: TwelveDataQuoteResponse; historical: unknown }> =
+		new BinanceProvider();
 
 	constructor(
 		private readonly findAssetUseCase: FindAssetUseCase,
@@ -100,6 +106,25 @@ export class GetAssetDetailsUseCase {
 		// if (!asset.pricing_source) {
 		// 	return null;
 		// }
+
+		if (asset.asset_type === AssetType.crypto || asset.asset_type === AssetType.stablecoin) {
+			const symbol = getBinanceSymbolForAsset(asset);
+			if (!symbol) {
+				return null;
+			}
+			const data = await requestProviderQuotesWithCache(
+				this.cryptoPriceProvider,
+				[asset],
+				this.assetPriceRepository,
+				[symbol],
+				{ symbolResolver: getBinanceSymbolForAsset },
+			);
+			const normalized = normalizeTwelveDataQuoteResponse(data);
+			const caches = buildLivePriceCaches(this.cryptoPriceProvider, [asset], normalized, {
+				symbolResolver: getBinanceSymbolForAsset,
+			});
+			return caches.find((item) => item.assetId === asset.id) ?? null;
+		}
 
 		try {
 			const response = await this.getAssetLivePriceUseCase.execute([asset.id]);
