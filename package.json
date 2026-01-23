@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
 		"build": "rimraf ./dist && tsc",
-		"start": "node ./dist/src/app.js",
+		"start": "node ./dist/main.js",
 		"tsc": "tsc",
 		"lint": "eslint \"src/**/*.{ts,tsx}\""
 	},
