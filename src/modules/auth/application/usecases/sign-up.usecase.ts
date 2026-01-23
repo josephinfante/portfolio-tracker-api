@@ -8,6 +8,8 @@ import { ValidationError } from "@shared/errors/domain/validation.error";
 import { zodErrorMapper } from "@shared/helpers/zod-error-mapper";
 import { AuthMapper } from "@modules/auth/infrastructure/auth.mapper";
 import { ConflictError } from "@shared/errors/domain/conflict.error";
+import { environment } from "@shared/config/environment";
+import { AuthorizationError } from "@shared/errors/domain/authorization.error";
 
 @injectable()
 export class SignUpUseCase {
@@ -18,6 +20,10 @@ export class SignUpUseCase {
 	) {}
 
 	async execute(input: unknown) {
+		if (environment.DISABLE_SIGNUP) {
+			throw new AuthorizationError("Sign up is disabled");
+		}
+
 		// Zod validation
 		const result = SignUpSchema.safeParse(input);
 		if (!result.success) {

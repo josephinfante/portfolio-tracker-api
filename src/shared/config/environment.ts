@@ -17,6 +17,7 @@ export interface IEnvironmentVariables {
 	DB_URL: string;
 	REDIS_URL: string;
 	ASSETPRICE_PROVIDER_API_KEY: string;
+	DISABLE_SIGNUP?: boolean;
 }
 
 const environmentSchema = z.object({
@@ -53,6 +54,7 @@ const environmentSchema = z.object({
 			}
 		}, "REDIS_URL must be a valid Redis URL"),
 	ASSETPRICE_PROVIDER_API_KEY: z.string().min(1, "ASSETPRICE_PROVIDER_API_KEY is required"),
+	DISABLE_SIGNUP: z.coerce.boolean().optional().default(false),
 });
 
 const result = environmentSchema.safeParse(process.env);
